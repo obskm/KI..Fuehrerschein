@@ -1,0 +1,2110 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KI-Führerschein Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+
+/* Layout: Vollbild-Arena (Canvas) mit HUD-Ecken wie im Mobile-Brawler, Dialoge als dicke Comic-Panels darüber */
+:root{
+  --sand:#e8a76a; --ink:#1d1233; --panel:#2b3a8f; --panel-2:#1c2668; --panel-edge:#0e1440;
+  --yellow:#ffd23a; --yellow-d:#c48d00; --blue:#36a3ff; --blue-d:#1a5fb8;
+  --green:#4fd43e; --green-d:#2b8a1f; --red:#ff4d5e; --red-d:#b4202f;
+  --paper:#ffffff; --paper-ink:#1d1233; --muted:#c8d0ff;
+  --z-grund:#36a3ff; --z-sicher:#ff5a4d; --z-kreativ:#b05cff;
+  --display:"Lilita One","Arial Black",Impact,system-ui,sans-serif;
+  --body:"Nunito","Trebuchet MS",system-ui,sans-serif;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+html,body{height:100%;background:#3a2318;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+body{font-family:var(--body);color:var(--paper);margin:0}
+#game{position:fixed;inset:0;background:#3a2318}
+canvas#c{display:block;width:100%;height:100%}
+
+/* HUD */
+.hud{position:fixed;z-index:5;pointer-events:none}
+#hudLeft{top:calc(10px + env(safe-area-inset-top,0px));left:calc(12px + env(safe-area-inset-left,0px))}
+#hudRight{top:calc(10px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.bar-wrap{display:flex;align-items:center;gap:8px;background:rgba(16,14,40,.72);border:3px solid var(--panel-edge);border-radius:12px;padding:5px 10px 6px}
+.bar-label{font-family:var(--display);font-size:13px;letter-spacing:.06em;color:var(--yellow);text-shadow:0 2px 0 var(--ink)}
+.bar{position:relative;width:min(34vw,210px);height:20px;background:#17183a;border:2px solid #000;border-radius:7px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;width:0%;background:linear-gradient(#7ee0ff,#2aa8ff);transition:width .5s}
+.bar span{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:14px;color:#fff;text-shadow:0 2px 0 #000,0 0 3px #000}
+.top-row{display:flex;gap:8px;pointer-events:auto}
+.chip{font-family:var(--display);font-size:16px;background:rgba(16,14,40,.72);border:3px solid var(--panel-edge);border-radius:12px;padding:6px 10px;color:#fff;text-shadow:0 2px 0 #000;display:flex;align-items:center;gap:6px}
+.chip b{color:var(--yellow);font-weight:400}
+#minimap{width:156px;height:117px;border:3px solid var(--panel-edge);border-radius:12px;background:#000;pointer-events:none}
+@media (max-height:430px){#minimap{width:120px;height:90px}}
+
+/* Buttons */
+.btn{font-family:var(--display);font-size:18px;letter-spacing:.02em;border:3px solid var(--ink);border-radius:14px;padding:10px 18px 12px;cursor:pointer;color:var(--ink);background:var(--yellow);box-shadow:inset 0 -5px 0 var(--yellow-d),0 3px 0 var(--ink);text-shadow:none;transition:transform .08s}
+.btn:active{transform:translateY(2px);box-shadow:inset 0 -2px 0 var(--yellow-d),0 1px 0 var(--ink)}
+.btn:focus-visible,.opt:focus-visible,.icon-btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.btn[disabled]{opacity:.6;cursor:default;transform:none;filter:grayscale(.4)}
+.btn.wait{position:relative;overflow:hidden}
+.btn.wait::after{content:"";position:absolute;left:0;bottom:0;height:5px;width:0;background:rgba(29,18,51,.5);animation:waitbar 3s linear forwards}
+@keyframes waitbar{to{width:100%}}
+.btn.blue{background:var(--blue);color:#fff;box-shadow:inset 0 -5px 0 var(--blue-d),0 3px 0 var(--ink);text-shadow:0 2px 0 rgba(0,0,0,.35)}
+.btn.ghost{background:#e6e9ff;box-shadow:inset 0 -5px 0 #a8b0e0,0 3px 0 var(--ink)}
+.btn.red{background:var(--red);color:#fff;box-shadow:inset 0 -5px 0 var(--red-d),0 3px 0 var(--ink)}
+.btn.small{font-size:15px;padding:7px 12px 9px;border-radius:12px}
+.icon-btn{font-family:var(--display);font-size:15px;background:var(--blue);color:#fff;border:3px solid var(--ink);border-radius:12px;padding:5px 10px 7px;box-shadow:inset 0 -4px 0 var(--blue-d);cursor:pointer;text-shadow:0 2px 0 rgba(0,0,0,.35)}
+
+/* Action button */
+#actBtn{position:fixed;z-index:6;right:calc(26px + env(safe-area-inset-right,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));width:104px;height:104px;border-radius:50%;border:4px solid var(--ink);background:radial-gradient(circle at 50% 38%,#ff8a7a,#e8323f 70%);box-shadow:inset 0 -7px 0 #a01b29,0 4px 0 var(--ink);color:#fff;font-family:var(--display);font-size:17px;line-height:1.05;text-shadow:0 2px 0 rgba(0,0,0,.45);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px}
+#actBtn small{font-size:12px;opacity:.95;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#actBtn.off{background:radial-gradient(circle at 50% 38%,#9aa0b8,#5d6280 70%);box-shadow:inset 0 -7px 0 #3c4058,0 4px 0 var(--ink);opacity:.75}
+#actBtn.pulse{animation:pulse 1s infinite}
+@keyframes pulse{50%{transform:scale(1.07)}}
+#hint{position:fixed;z-index:5;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-weight:800;font-size:13px;background:rgba(16,14,40,.6);padding:4px 10px;border-radius:999px;pointer-events:none;white-space:nowrap}
+@media (max-width:700px){#hint{display:none}}
+
+#toast{position:fixed;z-index:15;top:calc(70px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);font-family:var(--display);font-size:20px;color:#fff;text-shadow:0 3px 0 #000;background:linear-gradient(var(--panel),var(--panel-2));border:4px solid var(--ink);border-radius:16px;padding:10px 18px;max-width:min(92vw,560px);text-align:center;pointer-events:none;opacity:0;transition:opacity .25s,transform .25s}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(6px)}
+
+/* Overlays */
+.overlay{position:fixed;inset:0;z-index:20;background:rgba(10,8,30,.62);display:flex;align-items:center;justify-content:center;padding-block:calc(10px + env(safe-area-inset-top,0px)) calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));touch-action:auto}
+.panel{width:min(780px,100%);max-height:100%;overflow:auto;background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);border:4px solid var(--ink);border-radius:22px;box-shadow:0 6px 0 var(--ink),inset 0 3px 0 rgba(255,255,255,.25);padding:16px;-webkit-overflow-scrolling:touch;user-select:text;-webkit-user-select:text}
+.panel h2{font-family:var(--display);font-weight:400;font-size:clamp(22px,4vw,30px);margin:0;line-height:1.1;text-shadow:0 3px 0 var(--ink);text-wrap:balance}
+.panel h3{font-family:var(--display);font-weight:400;font-size:19px;margin:0 0 6px;color:var(--yellow);text-shadow:0 2px 0 var(--ink);letter-spacing:.02em}
+.who{display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.who canvas{width:96px;height:96px;flex:none;border:4px solid var(--ink);border-radius:18px;background:#7fd0ff}
+.who .meta{min-width:0}
+.tag{display:inline-block;font-family:var(--display);font-size:13px;letter-spacing:.05em;padding:3px 9px 4px;border:2px solid var(--ink);border-radius:8px;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);margin-bottom:6px}
+.bubble{position:relative;background:var(--paper);color:var(--paper-ink);border:4px solid var(--ink);border-radius:18px;padding:14px 16px;font-size:17px;font-weight:800;line-height:1.45;margin:4px 0 14px}
+.bubble::before{content:"";position:absolute;left:34px;top:-16px;border:12px solid transparent;border-bottom:14px solid var(--ink);border-top:0}
+.bubble::after{content:"";position:absolute;left:38px;top:-9px;border:8px solid transparent;border-bottom:10px solid var(--paper);border-top:0}
+.know{background:#fff8dc;color:var(--paper-ink);border:4px solid var(--ink);border-radius:18px;padding:14px 16px 12px;margin-bottom:14px}
+.know ul{margin:0;padding-left:20px;display:grid;gap:7px;font-size:16px;font-weight:700;line-height:1.45}
+.know li::marker{color:#e8323f}
+.example{margin-top:10px;background:#ffe3f4;border:3px dashed #d63aa0;border-radius:12px;padding:10px 12px;font-weight:700;font-size:15px;line-height:1.45}
+.example b{font-family:var(--display);font-weight:400;color:#c21f86;letter-spacing:.04em}
+.know a{color:#1a5fb8;font-weight:900}
+.know .no{margin-top:10px;background:#ffe1e1;border:3px solid var(--red-d);border-radius:12px;padding:8px 12px;font-weight:800}
+.actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:6px}
+.qhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.dots{display:flex;gap:6px}
+.dots i{width:14px;height:14px;border-radius:50%;background:#46508f;border:2px solid var(--ink)}
+.dots i.ok{background:var(--green)} .dots i.no{background:var(--red)} .dots i.cur{background:var(--yellow)}
+.question{font-size:clamp(17px,2.6vw,20px);font-weight:900;line-height:1.35;margin:4px 0 12px;text-wrap:pretty}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:620px){.opts{grid-template-columns:1fr}}
+.opt{display:flex;gap:10px;align-items:flex-start;text-align:left;font-family:var(--body);font-weight:800;font-size:16px;line-height:1.35;color:var(--paper-ink);background:#fff;border:3px solid var(--ink);border-radius:14px;padding:10px 12px 12px;box-shadow:inset 0 -4px 0 #c9cde8;cursor:pointer;min-width:0}
+.opt .l{flex:none;font-family:var(--display);font-weight:400;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff;border:2px solid var(--ink);text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.opt:nth-child(1) .l{background:#ff5a4d}.opt:nth-child(2) .l{background:#36a3ff}.opt:nth-child(3) .l{background:#ffb21e}.opt:nth-child(4) .l{background:#4fd43e}
+.opt.right{background:#d8ffd0;box-shadow:inset 0 -4px 0 var(--green)}
+.opt.wrong{background:#ffd9dc;box-shadow:inset 0 -4px 0 var(--red)}
+.opt[disabled]{cursor:default}
+.opt[disabled]:not(.right):not(.wrong){opacity:.55}
+.feedback{margin-top:12px;border:3px solid var(--ink);border-radius:14px;padding:10px 12px;font-weight:800;line-height:1.45;font-size:15px}
+.feedback.good{background:#e3ffdc;color:#14420c}
+.feedback.bad{background:#ffe5e7;color:#5a0d16}
+.feedback strong{font-family:var(--display);font-weight:400;font-size:18px;display:block;margin-bottom:2px}
+.result{text-align:center;padding:6px 0}
+.stars{display:flex;justify-content:center;gap:8px;margin:8px 0}
+.stars svg{width:62px;height:62px;filter:drop-shadow(0 3px 0 var(--ink))}
+.stars svg.on{animation:pop .45s backwards}
+.stars svg:nth-child(2){animation-delay:.15s}.stars svg:nth-child(3){animation-delay:.3s}
+@keyframes pop{0%{transform:scale(0) rotate(-40deg)}80%{transform:scale(1.2)}100%{transform:scale(1)}}
+.result p{font-weight:800;font-size:17px;line-height:1.45;max-width:52ch;margin:6px auto 10px}
+
+/* Start */
+#start .panel{text-align:center}
+.logo{font-family:var(--display);font-size:clamp(34px,7vw,58px);line-height:.95;color:var(--yellow);text-shadow:0 4px 0 var(--ink),0 0 0 #000;-webkit-text-stroke:2px var(--ink);margin:4px 0 2px}
+.logo small{display:block;font-size:.42em;color:#fff;-webkit-text-stroke:1px var(--ink);letter-spacing:.08em;margin-top:6px}
+.sub{font-weight:800;color:var(--muted);margin:6px auto 14px;max-width:56ch;line-height:1.45}
+.picks{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 12px}
+@media (max-width:560px){.picks{grid-template-columns:repeat(2,1fr)}}
+.pick{background:#4656b8;border:4px solid var(--ink);border-radius:16px;padding:8px 6px 10px;cursor:pointer;color:#fff;font-family:var(--display);font-size:17px;box-shadow:inset 0 -5px 0 #2c3787;min-width:0}
+.pick canvas{width:100%;max-width:120px;aspect-ratio:1;display:block;margin:0 auto 4px;border-radius:12px;background:#7fd0ff;border:3px solid var(--ink)}
+.pick.sel{background:var(--yellow);color:var(--ink);box-shadow:inset 0 -5px 0 var(--yellow-d)}
+.duo{display:flex;justify-content:center;gap:22px;margin:4px 0 8px}
+.duo div{text-align:center;font-family:var(--display);font-size:18px;text-shadow:0 2px 0 var(--ink)}
+.duo canvas{width:104px;height:104px;display:block;margin:0 auto 6px;border:4px solid var(--ink);border-radius:18px}
+.name-row{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin:6px 0 4px}
+.name-row label{font-family:var(--display);font-size:18px}
+#nameInput{font-family:var(--display);font-size:20px;padding:8px 12px;border:3px solid var(--ink);border-radius:12px;width:min(260px,70vw);color:var(--ink);background:#fff}
+.name-err{display:inline-block;background:#ffe5e7;color:#5a0d16;border:3px solid var(--ink);border-radius:12px;padding:6px 12px;font-weight:900;font-size:14px;margin:0 0 12px}
+#nameInput.bad{border-color:var(--red);box-shadow:0 0 0 3px var(--red)}
+.privacy{font-size:13px;font-weight:800;color:var(--muted);margin:4px 0 12px}
+.controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-weight:800;font-size:13px;color:var(--muted);margin-top:12px}
+.controls span{background:rgba(0,0,0,.25);border-radius:999px;padding:4px 10px}
+kbd{font-family:var(--display);background:#fff;color:var(--ink);border-radius:5px;padding:0 5px;border:2px solid var(--ink)}
+
+/* Overview */
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:10px}
+.ov{display:flex;gap:10px;align-items:center;background:#3a4aa8;border:3px solid var(--ink);border-radius:14px;padding:8px;min-width:0}
+.ov canvas{width:54px;height:54px;flex:none;border:3px solid var(--ink);border-radius:10px;background:#7fd0ff}
+.ov .t{min-width:0;flex:1}
+.ov .t b{font-family:var(--display);font-weight:400;font-size:16px;display:block}
+.ov .t span{font-size:13px;font-weight:800;color:var(--muted);display:block;line-height:1.25}
+.ov .s{font-size:15px;color:var(--yellow);letter-spacing:1px}
+.ov.done{background:#2f7d3a}
+.ov button{flex:none}
+.zone-h{font-family:var(--display);font-size:16px;margin:14px 0 0;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.zone-h i{width:14px;height:14px;border-radius:4px;border:2px solid var(--ink)}
+.confirm{margin-top:12px;background:#ffe5e7;color:#5a0d16;border:3px solid var(--ink);border-radius:12px;padding:10px 12px;font-weight:800}
+
+/* Führerschein */
+.license{background:linear-gradient(160deg,#f4f7ff 0%,#e3e9ff 55%,#efe6ff 100%);color:#13235e;border:5px solid #13235e;border-radius:22px;overflow:hidden;box-shadow:0 6px 0 var(--ink)}
+.lic-top{background:#13235e;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 14px}
+.lic-badge{flex:none;width:52px;height:58px;background:linear-gradient(#3aa0ff,#1650c0);clip-path:polygon(50% 0,100% 18%,100% 62%,50% 100%,0 62%,0 18%);display:grid;place-items:center;font-family:var(--display);font-size:24px}
+.lic-title{font-family:var(--display);font-size:clamp(24px,5vw,38px);line-height:1;letter-spacing:.02em}
+.lic-title small{display:block;font-family:var(--body);font-weight:900;font-size:11px;letter-spacing:.18em;color:#9fd3ff;margin-top:4px}
+.lic-body{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:14px}
+@media (max-width:560px){.lic-body{grid-template-columns:1fr}}
+.lic-photo{background:#fff;border:3px dashed #8fa0d8;border-radius:12px;padding:6px;text-align:center;font-size:11px;font-weight:900;letter-spacing:.1em;color:#5b6aa3}
+.lic-photo canvas{width:100%;max-width:150px;aspect-ratio:1;display:block;margin:0 auto 4px;border-radius:8px;background:#7fd0ff}
+.lic-body h4{font-family:var(--display);font-weight:400;font-size:24px;margin:0 0 4px;color:#13235e}
+.lic-body p{margin:0 0 8px;font-weight:800;font-size:14px;line-height:1.4}
+.skills{display:grid;gap:6px;margin:0 0 10px;padding:0;list-style:none}
+.skills li{display:flex;gap:8px;align-items:center;background:#fff;border:2px solid #c5cdf0;border-radius:10px;padding:5px 8px;font-weight:800;font-size:14px}
+.skills li i{flex:none;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:#fff;font-style:normal;font-size:13px}
+.skills em{font-style:normal;color:#1a6fe0}
+.lic-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.lic-fields{grid-template-columns:1fr}}
+.lic-fields div{background:#fff;border:2px solid #c5cdf0;border-radius:10px;padding:5px 8px;min-width:0}
+.lic-fields span{display:block;font-size:10px;font-weight:900;letter-spacing:.12em;color:#5b6aa3}
+.lic-fields b{font-family:var(--display);font-weight:400;font-size:18px;overflow-wrap:anywhere}
+.promise{margin:10px 14px 0;background:#e6fff0;border:2px solid #4cc27a;border-radius:10px;padding:7px 10px;font-weight:800;font-size:13px;line-height:1.4;color:#0f4a28}
+.lic-foot{background:#13235e;color:#cfe3ff;text-align:center;font-weight:900;font-size:11px;letter-spacing:.16em;padding:7px;margin-top:12px}
+/* Minigames */
+.mg-badge{display:inline-block;font-family:var(--display);font-size:13px;letter-spacing:.08em;background:var(--yellow);color:var(--ink);border:2px solid var(--ink);border-radius:8px;padding:2px 8px}
+.mg-top{display:flex;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;font-family:var(--display);font-size:17px;margin-bottom:8px;text-shadow:0 2px 0 var(--ink)}
+.mg-top b{font-weight:400}
+.timer{height:14px;background:#17183a;border:3px solid var(--ink);border-radius:8px;overflow:hidden;margin-bottom:12px}
+.timer i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff4d5e,#ffd23a 40%,#4fd43e)}
+.card-big{background:#fff;color:var(--paper-ink);border:4px solid var(--ink);border-radius:18px;padding:20px 16px;text-align:center;font-size:clamp(18px,3vw,22px);font-weight:900;line-height:1.35;min-height:100px;display:grid;place-items:center;margin-bottom:12px;box-shadow:0 5px 0 var(--ink)}
+.card-big.in{animation:cardIn .3s}
+.card-big.good{background:#d8ffd0}.card-big.bad{background:#ffd9dc;animation:shake .35s}
+@keyframes cardIn{from{transform:translateY(16px) scale(.94);opacity:0}}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.sort-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn.sort-ok{background:var(--green);color:#fff;box-shadow:inset 0 -5px 0 var(--green-d),0 3px 0 var(--ink);text-shadow:0 2px 0 rgba(0,0,0,.3)}
+.mg-hint{font-size:13px;font-weight:800;color:var(--muted);margin-top:8px}
+.mgfb{min-height:48px;margin-top:10px;border-radius:12px;padding:8px 12px;font-weight:800;line-height:1.4;border:3px solid transparent}
+.mgfb.good{background:#e3ffdc;color:#14420c;border-color:var(--ink)}.mgfb.bad{background:#ffe5e7;color:#5a0d16;border-color:var(--ink)}
+.goal{background:#fff8dc;color:var(--paper-ink);border:4px solid var(--ink);border-radius:14px;padding:10px 12px;font-weight:900;font-size:17px;margin-bottom:10px;line-height:1.35}
+.goal span{display:block;font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.08em;color:#c21f86}
+.prompt-line{background:#0f1636;color:#d9f4ff;border:3px solid var(--ink);border-radius:12px;padding:12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;line-height:1.5;min-height:54px;margin-bottom:10px;overflow-wrap:anywhere}
+.prompt-line .ph{color:#8b97cc}
+.caret{display:inline-block;width:8px;height:1.1em;background:#50e6ff;vertical-align:-3px;margin-left:3px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.chip-pool{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.pchip{font-family:var(--body);font-weight:800;font-size:15px;color:var(--paper-ink);background:#fff;border:3px solid var(--ink);border-radius:999px;padding:7px 14px 9px;box-shadow:inset 0 -3px 0 #c9cde8;cursor:pointer;text-align:left}
+.pchip.on{background:var(--yellow);box-shadow:inset 0 -3px 0 var(--yellow-d)}
+.pchip.isgood{background:#d8ffd0;box-shadow:inset 0 -3px 0 var(--green)}
+.pchip.isbad{background:#ffd9dc;box-shadow:inset 0 -3px 0 var(--red);text-decoration:line-through}
+.pchip[disabled]{cursor:default}
+.pchip[disabled]:not(.isgood):not(.isbad){opacity:.5}
+.ki-reply{display:flex;gap:10px;align-items:flex-start;background:#0f1636;color:#d9f4ff;border:3px solid var(--ink);border-radius:12px;padding:10px 12px;font-weight:800;margin-top:8px;line-height:1.4}
+.ki-reply span,.ki-av{flex:none;font-family:var(--display);font-weight:400;background:#36a3ff;color:#fff;border:2px solid var(--ink);border-radius:8px;padding:2px 7px}
+.ki-chat{display:flex;gap:10px;align-items:flex-start;background:#0f1636;border:3px solid var(--ink);border-radius:16px;padding:12px}
+.ki-txt{color:#eef6ff;font-size:clamp(16px,2.6vw,19px);font-weight:800;line-height:1.95;min-width:0}
+.ki-txt .w{font:inherit;color:inherit;background:transparent;border:0;border-radius:6px;padding:0 2px;margin:0 1px;cursor:pointer;line-height:1.45}
+.ki-txt .w:hover{background:rgba(255,255,255,.14)}
+.ki-txt .w.hit{background:#4fd43e;color:#0b2a07;text-decoration:line-through}
+.ki-txt .w.nope{background:rgba(255,77,94,.4);animation:shake .3s}
+.ki-txt .w.miss{background:#ffd23a;color:var(--ink);text-decoration:line-through}
+.ki-txt .fix{font-style:normal;color:#7dff9a;font-weight:900}
+.scene{display:block;width:100%;aspect-ratio:640/400;border:4px solid var(--ink);border-radius:14px;cursor:crosshair;background:#7fd0ff}
+.found-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.found-list li{background:#e3ffdc;color:#14420c;border:2px solid var(--ink);border-radius:10px;padding:6px 10px;font-weight:800;font-size:14px;line-height:1.35}
+.found-list li.missed{background:#fff3c4;color:#5a4300}
+/* Puzzle & Lückentext */
+.order-slots{display:grid;gap:8px;margin-bottom:10px}
+.oslot{display:flex;gap:10px;align-items:center;min-height:50px;border:3px dashed #8b97cc;border-radius:12px;padding:6px 8px;background:rgba(255,255,255,.06)}
+.oslot .no{font-family:var(--display);width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--yellow);color:var(--ink);border:2px solid var(--ink);flex:none}
+.oslot .free{color:#9aa5d8;font-weight:800}
+.oslot.ok{border-style:solid;border-color:var(--green);background:rgba(79,212,62,.15)}
+.oslot.ok .ocard{background:#d8ffd0;box-shadow:inset 0 -3px 0 var(--green);cursor:default}
+.ocard{font-family:var(--body);font-weight:800;font-size:15px;line-height:1.35;color:var(--paper-ink);background:#fff;border:3px solid var(--ink);border-radius:12px;padding:8px 12px;box-shadow:inset 0 -3px 0 #c9cde8;cursor:pointer;text-align:left;width:100%;min-width:0}
+.opool{display:grid;gap:8px;margin-top:8px}
+.cloze{background:#fff;color:var(--paper-ink);border:4px solid var(--ink);border-radius:16px;padding:12px 16px;font-size:clamp(16px,2.4vw,18px);font-weight:800;line-height:2.3}
+.gap{font:inherit;font-size:16px;font-weight:900;color:#1a5fb8;border:0;border-bottom:3px solid #1a5fb8;background:#eef4ff;border-radius:6px 6px 0 0;padding:1px 6px;text-align:center;max-width:100%}
+.gap:focus{outline:3px solid var(--yellow);outline-offset:1px}
+.gap.ok{color:#14420c;background:#d8ffd0;border-color:var(--green)}
+.gap.no{color:#5a0d16;background:#ffd9dc;border-color:var(--red);text-decoration:line-through}
+.gap-fix{color:#2b8a1f;font-weight:900}
+.bank{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.bank .pchip.used{opacity:.4}
+.match-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+@media (max-width:560px){.match-slots{grid-template-columns:1fr}}
+.mslot{border:3px dashed #8b97cc;border-radius:14px;padding:8px 10px;min-height:86px;background:rgba(255,255,255,.06);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.mslot:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.mslot b{font-family:var(--display);font-weight:400;font-size:15px;color:var(--yellow);letter-spacing:.05em}
+.mslot .free{color:#9aa5d8;font-weight:800;font-size:14px}
+.mslot.ok{border-style:solid;border-color:var(--green);background:rgba(79,212,62,.15);cursor:default}
+.mslot.ready{border-color:var(--yellow)}
+.pchip.sel{outline:4px solid var(--yellow);outline-offset:2px}
+.reveal{margin-top:12px;display:grid;gap:10px}
+.reveal canvas{width:100%;aspect-ratio:640/360;display:block;border:4px solid var(--ink);border-radius:14px;background:#7fd0ff}
+/* Wortspeicher */
+.icon-btn.gl{background:var(--green);box-shadow:inset 0 -4px 0 var(--green-d)}
+.icon-btn.gl.blink{animation:glBlink .6s ease-in-out 6}
+@keyframes glBlink{50%{transform:scale(1.15);background:var(--yellow);color:var(--ink);text-shadow:none;box-shadow:inset 0 -4px 0 var(--yellow-d),0 0 0 6px rgba(255,210,58,.55),0 0 18px 6px rgba(255,210,58,.8)}}
+@media (max-width:620px){.icon-btn{font-size:13px;padding:4px 8px 6px}#hudRight .chip{display:none}.bar-label{display:none}.bar{width:30vw}}
+#glossary{z-index:25}
+.gl-search{width:100%;font-family:var(--body);font-weight:800;font-size:16px;padding:10px 14px;border:3px solid var(--ink);border-radius:12px;color:var(--ink);background:#fff;margin:10px 0 4px}
+.gl-letter{font-family:var(--display);font-size:22px;color:var(--yellow);text-shadow:0 2px 0 var(--ink);margin:14px 0 6px}
+.gl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.gl-item{background:#fff;color:var(--paper-ink);border:3px solid var(--ink);border-radius:14px;padding:10px 12px;min-width:0}
+.gl-item h4{font-family:var(--display);font-weight:400;font-size:19px;margin:0 0 4px;color:#1a5fb8}
+.gl-item p{margin:0;font-weight:700;font-size:15px;line-height:1.4}
+.gl-item .ex{margin-top:6px;font-size:14px;color:#5b4a7a;font-style:italic}
+.gl-item .who{display:inline-block;margin-top:8px;font-family:var(--display);font-size:12px;letter-spacing:.05em;background:#eef0ff;border:2px solid #c5cdf0;border-radius:8px;padding:1px 7px;color:#3a4aa8}
+.gl-empty{font-weight:800;color:var(--muted);margin-top:12px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div id="game">
+  <canvas id="c" aria-label="Spielwelt der KI-Führerschein Arena"></canvas>
+</div>
+
+<div class="hud" id="hudLeft">
+  <div class="bar-wrap">
+    <div class="bar-label">KI-<br>FÜHRERSCHEIN</div>
+    <div class="bar"><i id="progFill"></i><span id="progText">0 / 11</span></div>
+  </div>
+</div>
+<div class="hud" id="hudRight">
+  <div class="top-row">
+    <div class="chip"><b>★</b><span id="starText">0/33</span></div>
+    <button class="icon-btn gl" id="glBtn" type="button">Wortspeicher</button>
+    <button class="icon-btn" id="menuBtn" type="button">Übersicht</button>
+  </div>
+  <canvas id="minimap" width="312" height="234"></canvas>
+</div>
+<button id="actBtn" class="off" type="button" aria-label="Sprechen"><span>Sprechen</span><small id="actName">niemand da</small></button>
+<div id="hint">Laufen: <kbd>WASD</kbd>/Pfeile oder Joystick · Sprechen: <kbd>E</kbd> / Leertaste</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="overlay" id="start">
+  <div class="panel">
+    <div class="logo">KI-FÜHRERSCHEIN<small>DIE ARENA</small></div>
+    <p class="sub">In der Arena warten 11 Leute mit Fragen rund um Künstliche Intelligenz. Lauf zu ihnen, hilf ihnen mit einem kurzen Quiz und hol dir am Ende bei KAI deinen KI-Führerschein!</p>
+    <h3>Wähle deine Figur</h3>
+    <div class="picks" id="picks"></div>
+    <div class="actions" style="justify-content:center">
+      <button class="btn" id="startBtn" type="button">LOS GEHT’S!</button>
+    </div>
+    <div class="controls">
+      <span>Laufen: Joystick ziehen oder <kbd>WASD</kbd></span>
+      <span>Sprechen: roter Knopf, <kbd>E</kbd> oder antippen</span>
+      <span>Übersicht: <kbd>M</kbd></span>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="dialog" hidden><div class="panel" id="dlgPanel"></div></div>
+<div class="overlay" id="overview" hidden><div class="panel" id="ovPanel"></div></div>
+<div class="overlay" id="glossary" hidden><div class="panel" id="glPanel"></div></div>
+
+<script>
+(() => {
+'use strict';
+/* ===================== INHALTE ===================== */
+const ZONES = {
+  grund:   {name:'Grundwissen',          color:'#36a3ff'},
+  sicher:  {name:'Sicherheit & Datenschutz',   color:'#ff5a4d'},
+  kreativ: {name:'Kreativ-Werkstatt',    color:'#b05cff'}
+};
+const STATIONS = [
+{ id:'s1', nr:'3', zone:'grund', topic:'Was ist überhaupt KI?', name:'Milo', x:430, y:380,
+  mg:{type:'sort', title:'KI oder keine KI?', yes:'✓ Mit KI', no:'✕ Ohne KI',
+    intro:'Gleich kommen 10 Karten mit Dingen aus dem Alltag. Entscheide schnell: Steckt da <b>KI</b> drin oder <b>nicht</b>? Du hast pro Karte 7 Sekunden.',
+    items:[
+      ['Ein Sprachassistent, der deine Frage beantwortet', true, 'Er erkennt deine Sprache und erzeugt Antworten mit KI.'],
+      ['Eine Übersetzungs-App, die ganze Sätze übersetzt', true, 'Moderne Übersetzer arbeiten mit KI.'],
+      ['Gesichtserkennung zum Entsperren des Handys', true, 'Das Handy erkennt dein Gesicht mit KI.'],
+      ['Video-Empfehlungen auf einer Streaming-Plattform', true, 'Eine KI berechnet, was dir gefallen könnte.'],
+      ['Ein Chatbot, der Texte schreibt', true, 'Chatbots sind KI-Programme.'],
+      ['Eine Navi-App, die Staus vorhersagt', true, 'Die Stau-Vorhersage berechnet eine KI aus vielen Daten.'],
+      ['Eine Taschenlampe', false, 'Licht an, Licht aus: keine KI.'],
+      ['Ein Lineal', false, 'Ein Lineal ist ein einfaches Werkzeug ohne KI.'],
+      ['Eine Fahrradklingel', false, 'Klingeln geht ganz ohne KI.'],
+      ['Ein gedrucktes Wörterbuch', false, 'Papier lernt nichts dazu: keine KI.'],
+      ['Ein Lichtschalter', false, 'Ein Schalter folgt nur an/aus: keine KI.'],
+      ['Ein Wecker, der einfach um 7 Uhr klingelt', false, 'Er folgt nur einer festen Uhrzeit: keine KI.']]},
+  look:{skin:'#f1c08f', hair:'#3b2412', hairStyle:'short', shirt:'#3fbf5f', pants:'#2d3f8f', acc:'capBack', accColor:'#e8323f'},
+  ask:'Alle reden über KI. Aber was ist das eigentlich? Hat so ein Chatbot ein Gehirn wie wir?',
+  info:['KI heißt <b>Künstliche Intelligenz</b>. Das sind Computerprogramme, die aus sehr vielen Daten lernen.',
+        'Die KI erkennt Muster und berechnet, welche Antwort am wahrscheinlichsten passt.',
+        'Eine KI hat kein Bewusstsein und keine Gefühle. Sie versteht nicht so wie ein Mensch.',
+        'Du begegnest KI ständig: Sprachassistent, Übersetzungs-App, Gesichtserkennung am Handy, Video-Empfehlungen.'],
+  thanks:'Ah, jetzt hab ich’s! KI ist ein Programm, das aus Daten lernt, und kein Gehirn mit Gefühlen.',
+  quiz:[
+    {q:'Wofür steht die Abkürzung KI?', a:['Künstliche Intelligenz','Kluge Information','Kontrollierte Internetseite','Kreative Ideenmaschine'], e:'KI steht für Künstliche Intelligenz. Auf Englisch sagt man AI (Artificial Intelligence).'},
+    {q:'Wie lernt eine KI?', a:['Sie erkennt Muster in sehr vielen Daten.','Sie sammelt Erfahrungen und Gefühle wie ein Mensch.','Sie liest die Gedanken der Menschen.','Sie weiß von Anfang an einfach alles.'], e:'Eine KI wird mit riesigen Datenmengen trainiert und erkennt darin Muster.'},
+    {q:'Wo steckt KI drin?', a:['In einem Sprachassistenten auf dem Handy','In einer Taschenlampe','In einem Lineal','In einer Fahrradklingel'], e:'Sprachassistenten erkennen deine Sprache mit KI und erzeugen Antworten.'}],
+  exam:{q:'Welche Aussage über KI stimmt?', a:['KI berechnet, welche Antwort am wahrscheinlichsten passt.','KI hat echte Gefühle.','KI macht niemals Fehler.','In der KI sitzt ein kleiner Mensch.'], e:'KI rechnet mit Wahrscheinlichkeiten. Gefühle hat sie keine, und Fehler macht sie auch.'}
+},
+{ id:'s2', nr:'7', zone:'grund', topic:'Wie funktioniert das Prompten?', name:'Lina', x:880, y:620,
+  mg:{type:'prompt', title:'Prompt-Baukasten', intro:'Hilf mir, drei richtig gute Prompts zu bauen! Tippe die passenden <b>Bausteine</b> an. Aber Vorsicht: Manche Bausteine sind zu ungenau oder verraten persönliche Daten.'},
+  look:{skin:'#c98b5e', hair:'#7b3fd1', hairStyle:'ponytail', shirt:'#ffcf3a', pants:'#3a3a6a', acc:'glasses', accColor:'#1d1233'},
+  ask:'Ich habe der KI geschrieben: „Mach was über Hunde.“ Rausgekommen ist totaler Quatsch. Wie rede ich richtig mit der KI?',
+  info:['Deine Eingabe an die KI heißt <b>Prompt</b>.',
+        'Formuliere genau, was du möchtest: treffende Verben und Adjektive, Textart, Länge, für wen.',
+        'Beschreibe mit Beispielen, wie das Ergebnis aussehen soll.',
+        'Frag die KI, ob sie noch weitere Informationen von dir braucht.',
+        'Tipp: Du kannst die KI auch fragen, wie du deinen Prompt am besten formulierst.'],
+  example:'„Schreibe einen kurzen Sachtext (ca. 100 Wörter) für die 7. Klasse über die Ernährung von Hunden. Nutze einfache Sprache und eine Zwischenüberschrift.“',
+  thanks:'Super! Ich schreibe jetzt genau, was ich will, und frage nach, wenn etwas fehlt.',
+  quiz:[
+    {q:'Was ist ein Prompt?', a:['Die Eingabe oder Anweisung an die KI','Die Antwort der KI','Ein Computervirus','Ein geheimes Passwort'], e:'Der Prompt ist das, was du der KI schreibst oder sagst.'},
+    {q:'Welcher Prompt ist am besten?', a:['„Schreibe einen kurzen Sachtext (ca. 100 Wörter) für die 7. Klasse über die Ernährung von Hunden.“','„Mach was über Hunde.“','„Hunde!!!“','„Erzähl mir einfach alles.“'], e:'Der beste Prompt nennt Textart, Länge, Zielgruppe und Thema.'},
+    {q:'Die Antwort der KI passt nicht. Was hilft?', a:['Den Prompt genauer machen und fragen, welche Infos der KI fehlen','Denselben Prompt zehnmal abschicken','Sofort aufgeben','Alles in GROSSBUCHSTABEN schreiben'], e:'Nachschärfen und Rückfragen zulassen führt zu besseren Ergebnissen.'}],
+  exam:{q:'Welcher Tipp gehört zum guten Prompten?', a:['Mit Beispielen beschreiben, was du möchtest','So kurz und ungenau wie möglich schreiben','Echte Namen nennen, damit es persönlicher wird','Immer nur ein einziges Wort eingeben'], e:'Beispiele zeigen der KI, wie das Ergebnis aussehen soll.'}
+},
+{ id:'s3', nr:'1', zone:'sicher', topic:'Sicherheit & Datenschutz', name:'Paul', x:1900, y:340,
+  mg:{type:'sort', title:'Daten-Sortierer', intro:'Gleich kommen 10 Karten. Entscheide schnell: <b>Darf das in die KI</b> oder <b>bleibt es bei dir</b>? Du hast pro Karte 7 Sekunden.'},
+  look:{skin:'#f6d2b0', hair:'#d9a53a', hairStyle:'short', shirt:'#2b4fbf', pants:'#262640', acc:'beanie', accColor:'#ff8a1e'},
+  ask:'Ich will der KI ein Foto von meiner Klasse schicken, mit allen Namen und unserer Adresse. Dann schreibt sie uns eine Einladung. Gute Idee?',
+  info:['Gib <b>niemals</b> echte Namen, Adressen oder Fotos von Personen in eine KI ein!',
+        'Die KI kann sich Eingaben merken. Deine Daten oder die Daten anderer Menschen können gespeichert und missbraucht werden.',
+        'Das gilt auch für Telefonnummern, Passwörter und Geburtsdaten.',
+        'Nutze Platzhalter wie „[Name]“ oder „Person A“ und trag die echten Daten später selbst ein.'],
+  thanks:'Puh, gut dass ich gefragt habe! Ich nehme Platzhalter und schicke keine Fotos.',
+  quiz:[
+    {q:'Welche Eingabe ist unbedenklich?', a:['„Erkläre mir die Photosynthese.“','„Ich heiße Lea Schmidt und wohne in der Hauptstraße 5.“','Ein Foto deiner besten Freundin','„Meine Handynummer ist 0171 …“'], e:'Eine Sachfrage enthält keine persönlichen Daten.'},
+    {q:'Warum solltest du keine persönlichen Daten eingeben?', a:['Die KI kann sie speichern und sie könnten missbraucht werden.','Die KI wird davon langsamer.','Die KI versteht keine Namen.','Das kostet extra Geld.'], e:'Was du eingibst, kann gespeichert werden. Das gilt auch für Daten anderer Menschen.'},
+    {q:'Du lässt eine Einladung schreiben. Was machst du mit den Namen?', a:['Platzhalter wie [Name] verwenden und später selbst eintragen','Alle echten Namen und Adressen eingeben','Fotos der Gäste hochladen','Die Handynummern dazuschreiben'], e:'Mit Platzhaltern bekommst du dieselbe Hilfe, ohne Daten preiszugeben.'}],
+  exam:{q:'Was gehört NICHT in eine KI?', a:['Fotos von anderen Personen','Eine Frage zu einer Matheaufgabe','Ein erfundener Name für eine Geschichte','Ein Thema für ein Referat'], e:'Fotos von Personen sind persönliche Daten und gehören nicht in die KI.'}
+},
+{ id:'s4', nr:'5', zone:'sicher', topic:'KI kann Fehler machen!', name:'Dr. Nova', x:2400, y:470,
+  mg:{type:'facts', title:'Fakten-Check', intro:'Die KI hat mir zwei Antworten geschrieben, und in jeder haben sich <b>drei falsche Fakten</b> versteckt. Tippe die falschen Wörter an! Aber Achtung: Jeder Fehlklick kostet einen Punkt.'},
+  look:{skin:'#e3a87c', hair:'#f2f2f2', hairStyle:'curly', shirt:'#ffffff', pants:'#3a3a6a', acc:'goggles', accColor:'#2fd1c8', coat:true},
+  ask:'Die KI hat mir erzählt, der Eiffelturm steht in Rom. Und sie klang dabei total sicher! Kann eine KI sich irren?',
+  info:['Ja! KI kann Fehler machen. Manchmal <b>„halluziniert“</b> sie sogar: Sie erfindet Dinge, die überzeugend klingen, aber falsch sind.',
+        'Es ist schwierig, alle Fehler zu finden. Wenn die KI sicher klingt, heißt das noch nicht, dass es stimmt.',
+        'Frag die KI nach ihren Quellen, z. B. nach konkreten Internetseiten.',
+        'Beauftrage die KI, sich selbst zu überprüfen.',
+        'Vergleiche wichtige Infos mit einer zweiten Quelle, z. B. deinem Schulbuch.'],
+  thanks:'Faszinierend! Ich frage ab jetzt nach Quellen und lasse die KI sich selbst überprüfen.',
+  quiz:[
+    {q:'Was bedeutet es, wenn eine KI „halluziniert“?', a:['Sie erfindet Infos, die echt klingen, aber falsch sind.','Sie träumt in der Nacht.','Sie wird müde und langsam.','Sie zeigt bunte Bilder an.'], e:'Halluzinieren heißt: Die KI gibt falsche Infos mit großer Überzeugung aus.'},
+    {q:'Wie kannst du eine KI-Antwort überprüfen?', a:['Nach Quellen fragen und mit einer zweiten Quelle vergleichen','Einfach glauben, was dasteht','Die Antwort laut vorlesen','Die Antwort ausdrucken'], e:'Quellen und eine zweite Quelle helfen dir, Fehler zu entdecken.'},
+    {q:'Die KI antwortet sehr sicher und ausführlich. Stimmt die Antwort dann?', a:['Nicht unbedingt, auch sicher klingende Antworten können falsch sein.','Ja, immer.','Ja, wenn die Antwort lang ist.','Ja, wenn Emojis darin vorkommen.'], e:'Wie sicher eine KI klingt, sagt nichts darüber, ob sie recht hat.'}],
+  exam:{q:'Du traust einer KI-Antwort nicht. Was kannst du tun?', a:['Die KI bitten, sich selbst zu überprüfen und Quellen zu nennen','Die Antwort sofort an alle schicken','Den Computer neu starten','Nichts, die KI hat immer recht'], e:'Selbstüberprüfung und Quellenangaben helfen, Fehler zu finden.'}
+},
+{ id:'s5', nr:'9', zone:'sicher', topic:'Fake oder echt?', name:'Jules', x:1980, y:720,
+  mg:{type:'spot', title:'Fake-Detektiv', intro:'Dieses Foto vom Schulfest wurde mit KI gemacht. Darin stecken <b>5 typische KI-Fehler</b>. Tippe sie an! Du hast 60 Sekunden, und jeder Fehlklick kostet 3 Sekunden.'},
+  look:{skin:'#8a5634', hair:'#1d1208', hairStyle:'afro', shirt:'#ff8a1e', pants:'#2a2a4a', acc:'camera', accColor:'#1d1233'},
+  ask:'Ich hab ein Video gesehen, da schwimmt ein Hai durch eine Einkaufsstraße! Das ist doch bestimmt echt, oder?',
+  info:['KI kann täuschend echte Bilder, Videos und sogar Stimmen erzeugen. Solche Fälschungen nennt man <b>Deepfakes</b>.',
+        'Achte auf Hinweise: seltsame Hände oder Finger, unlesbare Schrift, zu glatte Haut, unlogische Schatten oder Hintergründe.',
+        'Prüfe die Quelle: Wer hat es veröffentlicht? Berichten seriöse Nachrichtenseiten darüber?',
+        'Teile nichts vorschnell. Sonst verbreitest du den Fake weiter.'],
+  link:{href:'https://wonderlabplus.sciencemuseumgroup.org.uk/quizzes/ai-images-quiz-can-you-tell-whats-real', text:'Teste dich: Echt oder KI? (Bilder-Quiz des Science Museum, englisch)'},
+  thanks:'Okay, ich prüfe erst die Quelle, bevor ich so ein Video weiterschicke!',
+  quiz:[
+    {q:'Was ist ein Deepfake?', a:['Ein mit KI gefälschtes Bild, Video oder Tonstück, das echt wirkt','Eine Unterwasseraufnahme aus großer Tiefe','Ein kaputtes Video','Ein besonders scharfes Foto'], e:'Deepfakes sind mit KI erzeugte Fälschungen, die echt aussehen oder klingen.'},
+    {q:'Woran erkennst du ein KI-Bild oft?', a:['Seltsame Hände, unlesbare Schrift, unlogische Schatten','Es ist immer schwarz-weiß.','Es steht immer „KI“ darauf.','Es ist immer unscharf.'], e:'Bei Details wie Händen, Schrift und Schatten macht KI oft Fehler.'},
+    {q:'Du siehst ein spektakuläres Video. Was tust du zuerst?', a:['Die Quelle prüfen, bevor du es teilst','Es sofort an alle schicken','„Krass!“ darunter kommentieren','Es als Status posten'], e:'Erst prüfen, dann teilen. So stoppst du Fakes.'}],
+  exam:{q:'Ein Bild zeigt eine berühmte Person bei etwas sehr Ungewöhnlichem. Was ist sinnvoll?', a:['Prüfen, ob seriöse Nachrichtenseiten darüber berichten','Sofort glauben, Bilder lügen nie','Es weiterleiten und „Stimmt das?“ schreiben','Es als Profilbild benutzen'], e:'Seriöse Quellen helfen dir zu prüfen, ob etwas wirklich passiert ist.'}
+},
+{ id:'s6a', nr:'11', zone:'kreativ', topic:'Bilder generieren', name:'Kiki', x:330, y:1560,
+  worksheet:true,
+  task:'Frage deine Lehrkraft nach dem KI-Zugang.',
+  look:{skin:'#f1c08f', hair:'#ff4fa8', hairStyle:'buns', shirt:'#2fd1c8', pants:'#2d6ad1', acc:'none', accColor:'#ffcf3a'},
+  ask:'Ich will mit KI ein cooles Bild für unser Klassenplakat machen. Aber die Bilder sehen immer langweilig aus. Wie schaffe ich das?',
+  info:['Es gibt verschiedene KI-Modelle zur Bilderstellung.',
+        'Du kannst verschiedene Bild-Stile auswählen, z. B. Zeichnung, Comic oder Foto.',
+        'Beschreibe genau, wie dein Bild aussehen soll: Was ist zu sehen? Wo? Welche Farben?',
+        'Tipp: Liste der Text-KI auf, was dein Bild beinhalten soll, und lass dir von ihr einen fertigen Prompt zur Bilderstellung formulieren.'],
+  example:'„Erstelle ein Bild im Comic-Style, auf dem Folgendes zu sehen ist: Ein rosaroter Elefant, der genüsslich ein großes Eis mit Sahne und bunten Streuseln verspeist. Im Hintergrund sieht man Sand und Meer sowie drei Palmen mit Kokosnüssen.“',
+  thanks:'Yes! Stil, Motiv, Hintergrund: Mein Plakat wird der Hammer!',
+  quiz:[
+    {q:'Welcher Bild-Prompt ist am genauesten?', a:['„Comic-Bild: Ein rosaroter Elefant isst ein Eis mit bunten Streuseln, dahinter Strand, Meer und drei Palmen.“','„Ein Tier.“','„Ein Elefant mit Eis.“','„Mach was Lustiges.“'], e:'Stil, Motiv, Details und Hintergrund machen den Prompt genau.'},
+    {q:'Was ist mit „Bild-Stil“ gemeint?', a:['Wie das Bild aussieht, z. B. Comic, Zeichnung oder Foto','Wie groß die Datei ist','Wie viel das Bild kostet','Wie viele Bilder entstehen'], e:'Der Stil legt fest, wie das Bild gestaltet ist.'},
+    {q:'Welcher Tipp hilft dir beim Bild-Prompt?', a:['Die Text-KI einen fertigen Prompt für die Bild-KI formulieren lassen','Fotos von Mitschüler*innen hochladen','Nur ein einziges Wort eingeben','Möglichst viele Rechtschreibfehler machen'], e:'Die Text-KI kann deine Stichpunkte in einen guten Bild-Prompt verwandeln.'}],
+  exam:{q:'Du willst ein KI-Bild für ein Plakat. Was gehört in den Prompt?', a:['Was zu sehen ist, der Stil und der Hintergrund','Deine Adresse','Nur „Bild bitte“','Der Name deiner Lehrkraft'], e:'Motiv, Stil und Hintergrund beschreiben das Bild genau.'}
+},
+{ id:'s6b', nr:'2', zone:'kreativ', topic:'Texte erstellen & zusammenfassen', name:'Ben', x:680, y:1880,
+  mg:{type:'cloze', title:'Lückentext: Texte mit KI',
+    intro:'In meinem Merkzettel fehlen <b>4 Wörter</b>. Tippe sie ein oder tippe unten auf ein Wort.',
+    text:'1. Sag der KI genau, was für einen Text sie schreiben soll: zum Beispiel eine [Geschichte|Erzählung|Anleitung|Einladung|Zusammenfassung|E-Mail|Mail] oder einen Sachtext.\n2. Einen schwierigen Text kannst du [fotografieren|abfotografieren] und dir in [Stichpunkten|Stichpunkte] zusammenfassen lassen.\n3. Die KI kann dir auch [Fragen] zum Text stellen.',
+    extra:['Passwort','Schriftart']},
+  look:{skin:'#f6d2b0', hair:'#a8501e', hairStyle:'short', shirt:'#2e9a52', pants:'#4a3a2a', acc:'glassesBig', accColor:'#1d1233', book:true},
+  ask:'Ich muss drei Seiten über Vulkane lesen und verstehe nur Bahnhof. Kann mir die KI dabei helfen?',
+  info:['Texte schreiben lassen: Sag der KI genau, was für einen Text sie schreiben soll, z. B. eine Geschichte, einen Sachtext oder eine Anleitung.',
+        'Text zusammenfassen: Du kannst einen Text fotografieren und dir in Stichpunkten zusammenfassen lassen.',
+        'Oder du sagst der KI, sie soll dir Fragen zum Text stellen und deine Antworten auf Richtigkeit prüfen. So hast du ganz schnell einen <b>Lernpartner</b>!',
+        'Achtung: Fotografiere nur Texte, keine Personen.'],
+  thanks:'Stichpunkte und ein Quiz zum Text: Damit schaffe ich die Vulkane!',
+  quiz:[
+    {q:'Was solltest du angeben, wenn die KI einen Text schreiben soll?', a:['Welche Textart, z. B. Sachtext, Rezept oder Anleitung','Deine Schuhgröße','Deinen Wohnort','Gar nichts, die KI weiß das schon'], e:'Die Textart bestimmt Aufbau und Sprache des Textes.'},
+    {q:'Wie kann dir die KI bei einem schwierigen Text helfen?', a:['Sie fasst ihn in Stichpunkten zusammen.','Sie löscht ihn.','Sie schreibt ihn in Großbuchstaben.','Sie macht ihn doppelt so lang.'], e:'Eine Zusammenfassung in Stichpunkten zeigt dir das Wichtigste.'},
+    {q:'Wie wird die KI zu deinem Lernpartner für einen Text?', a:['Sie stellt dir Fragen zum Text und prüft deine Antworten.','Sie liest ihn und du musst nichts mehr tun.','Du schickst ihr deine Zeugnisnoten.','Du kopierst ihre Antwort ins Heft.'], e:'Wenn du selbst antwortest, lernst du den Inhalt wirklich.'}],
+  exam:{q:'Welche Bitte an die KI hilft dir, einen Text wirklich zu verstehen?', a:['„Stell mir 5 Fragen zum Text und prüfe meine Antworten.“','„Schreib meine Hausaufgabe.“','„Mach den Text länger.“','„Übersetze ihn ins Chinesische.“'], e:'Fragen beantworten und Rückmeldung bekommen ist echtes Lernen.'}
+},
+{ id:'s6c', nr:'8', zone:'kreativ', topic:'Recherche & Personen-Chat', name:'Lucy', x:1030, y:1560,
+  mg:{type:'order', title:'Interview-Puzzle', task:'Bring die Schritte in die richtige Reihenfolge!',
+    intro:'Ich möchte einen <b>Personen-Chat</b> machen: Die KI soll Marie Curie spielen, und ich stelle ihr Fragen wie in einem Interview. Die Schritte sind durcheinandergeraten! <b>Bring sie in die richtige Reihenfolge.</b> Du hast 3 Versuche.',
+    steps:['Der KI sagen, welche Rolle sie einnehmen soll: „Du bist Marie Curie.“',
+           'Falls nötig: der KI ein Arbeitsblatt oder eine Internetseite zur Rolle geben.',
+           'Der Rolle Fragen stellen, z. B. „Wann hast du gelebt?“',
+           'Wichtige Antworten mit einer zweiten Quelle überprüfen.']},
+  look:{skin:'#f1c08f', hair:'#9a9aa8', hairStyle:'bun', shirt:'#8a3fd1', pants:'#3a2a4a', acc:'glasses', accColor:'#c0392b'},
+  ask:'Für mein Referat über Marie Curie wollte ich einfach die KI fragen. Kann ich alles glauben, was sie sagt? Und stimmt es, dass man mit Marie Curie „chatten“ kann?',
+  info:['Zum Recherchieren ist die KI nur bedingt geeignet. Sie liefert gute Ideen, die aber nicht immer auf wahren Gegebenheiten beruhen.',
+        'Besser: Frag die KI nach geeigneten Webseiten zur Recherche und bitte sie, dir diese kurz zusammenzufassen.',
+        'Was ist ein <b>Personen-Chat</b>? Die KI tut so, als wäre sie eine bestimmte Person, z. B. die Forscherin Marie Curie. Du kannst ihr dann Fragen stellen, als würdest du mit dieser Person chatten.',
+        'So geht’s: Sag der KI zuerst, welche <b>Rolle</b> sie spielen soll, z. B. „Du bist Marie Curie“.',
+        'Gib der KI bei Bedarf mehr Infos zur Rolle, z. B. ein abfotografiertes Arbeitsblatt oder eine Internetseite.',
+        'Jetzt kannst du der Rolle Fragen stellen, z. B. wann sie gelebt hat.'],
+  thanks:'Ausgezeichnet! Erst Rolle festlegen, dann fragen, und zum Recherchieren gute Webseiten nutzen.',
+  quiz:[
+    {q:'Wie gut ist KI zum Recherchieren geeignet?', a:['Nur bedingt, ihre Infos stimmen nicht immer.','Perfekt, sie weiß alles.','Gar nicht, sie kennt keine Fakten.','Nur am Wochenende'], e:'KI liefert gute Ideen, aber nicht immer wahre Fakten.'},
+    {q:'Was ist ein besserer Weg, mit KI zu recherchieren?', a:['Nach geeigneten Webseiten fragen und sie zusammenfassen lassen','Nur die erste Antwort abschreiben','Eine Antwort raten lassen','Die KI um ein fertiges Referat bitten'], e:'Echte Webseiten sind überprüfbare Quellen.'},
+    {q:'Was tust du ZUERST bei einem Personen-Chat?', a:['Der KI sagen, welche Rolle sie einnehmen soll','Sofort Fragen stellen, ohne Rolle','Deinen vollen Namen nennen','Ein Selfie hochladen'], e:'Erst wenn die KI ihre Rolle kennt, kann sie als diese Person antworten.'}],
+  exam:{q:'Bei einem Personen-Chat fehlen der KI Infos zur Rolle. Was hilft?', a:['Ihr eine passende Internetseite oder ein Arbeitsblatt geben','Die KI raten lassen','Ohne Rolle weitermachen','Deine Adresse eingeben'], e:'Mit zusätzlichen Infos kann die KI die Rolle besser spielen.'}
+},
+{ id:'s6d', nr:'4', zone:'kreativ', topic:'Ideen bekommen', name:'Rico', x:1770, y:1560,
+  mg:{type:'order', title:'Ideen-Puzzle', task:'Bring die Schritte in die richtige Reihenfolge!',
+    intro:'So komme ich mit KI zu einer guten Projektidee, aber mein Plan ist durcheinander! <b>Bring die Schritte in die richtige Reihenfolge.</b> Du hast 3 Versuche.',
+    steps:['Überlegen, wofür du Ideen brauchst, z. B. für die Projektwoche.',
+           'Einen genauen Prompt schreiben: „Nenne mir 10 Ideen für …“',
+           'Die Ideen der KI in Ruhe durchlesen.',
+           'Die beste Idee auswählen.',
+           'Die Idee mit eigenen Gedanken weiterentwickeln.']},
+  look:{skin:'#c98b5e', hair:'#1d1208', hairStyle:'spiky', shirt:'#ff5a4d', pants:'#2a3a5a', acc:'helmet', accColor:'#ffcf3a'},
+  ask:'Wir sollen ein Projekt für die Projektwoche planen, aber mir fällt einfach nichts ein! Kann die KI mir helfen?',
+  info:['Die KI ist super, um Ideen zu bekommen, zum Beispiel für:',
+        'Projekte und kreative Ideen',
+        'Referatsvorbereitung und Themenübersichten',
+        'Geschichten, Gedichte …',
+        'Bitte z. B. um 10 Ideen, wähle die beste aus und entwickle sie selbst weiter.'],
+  thanks:'Zehn Ideen in zehn Sekunden! Jetzt such ich mir die beste aus und mach was Eigenes draus.',
+  quiz:[
+    {q:'Wofür kannst du die KI als Ideengeber nutzen?', a:['Für Referatsvorbereitung und Themenübersichten','Um Klassenarbeiten heimlich lösen zu lassen','Um Noten zu ändern','Um Passwörter zu erraten'], e:'Ideen sammeln, Themen sortieren und Referate vorbereiten: Dabei hilft die KI.'},
+    {q:'Welcher Prompt bringt dir gute Ideen?', a:['„Nenne mir 10 Projektideen für eine 7. Klasse zum Thema Umwelt.“','„Ideen.“','„Hilfe!“','„Was soll ich machen?“'], e:'Anzahl, Zielgruppe und Thema machen die Ideen passend.'},
+    {q:'Die KI hat dir 10 Ideen geliefert. Und jetzt?', a:['Du wählst aus und entwickelst die Idee selbst weiter.','Du machst einfach alle 10.','Du gibst die Liste als deine Arbeit ab.','Du löschst alles und fängst neu an.'], e:'Die KI gibt Anregungen. Was daraus wird, entscheidest du.'}],
+  exam:{q:'Wofür eignet sich KI als Ideengeber besonders gut?', a:['Für Geschichten, Gedichte und Projektideen','Zum Speichern deiner Passwörter','Als Ersatz für deine eigene Meinung','Um echte Fotos zu machen'], e:'Kreative Anregungen sind eine Stärke der KI.'}
+},
+{ id:'s6e', nr:'10', zone:'kreativ', topic:'KI als Lernhelfer', name:'Yara', x:2120, y:1880,
+  mg:{type:'sort', title:'Clever lernen oder schummeln?', yes:'✓ Clever lernen', no:'✕ Schummeln',
+    intro:'Hier kommen 10 Bitten an die KI. Entscheide schnell: Hilft das beim <b>Lernen</b> oder ist es <b>Schummeln</b>? Du hast pro Karte 7 Sekunden.',
+    items:[
+      ['„Frag mich meine Englisch-Vokabeln ab.“', true, 'Abfragen lassen trainiert dein Gedächtnis.'],
+      ['„Erklär mir Bruchrechnen Schritt für Schritt.“', true, 'Erklären lassen hilft dir, selbst zu verstehen.'],
+      ['„Stell mir 5 Fragen zum Thema Vulkane.“', true, 'So prüfst du, ob du das Thema kannst.'],
+      ['„Prüf, ob ich das Thema verstanden habe.“', true, 'Eine Rückmeldung zeigt dir, wo du stehst.'],
+      ['„Gib mir eine ähnliche Übungsaufgabe.“', true, 'Mehr Übung macht dich sicherer.'],
+      ['„Erklär mir, was ich hier falsch gemacht habe.“', true, 'Aus Fehlern lernst du am meisten.'],
+      ['„Löse alle Aufgaben auf Seite 34.“', false, 'Dann übst du nichts selbst.'],
+      ['„Schreib meinen Aufsatz, ich gebe ihn so ab.“', false, 'Das ist nicht deine Arbeit und du lernst nichts.'],
+      ['„Mach meine Hausaufgaben.“', false, 'Das rächt sich in der nächsten Lernzielkontrolle!'],
+      ['„Sag mir nur die Lösungen, ohne Erklärung.“', false, 'Ohne Erklärung verstehst du es nicht.'],
+      ['„Schreib mein Referat komplett.“', false, 'Dann ist es nicht dein Referat.'],
+      ['„Beantworte die Testfragen für mich.“', false, 'Im Test hilft dir keine KI.']]},
+  look:{skin:'#e3a87c', hair:'#2a1a10', hairStyle:'ponytail', shirt:'#36a3ff', pants:'#1d2a6a', acc:'headband', accColor:'#ff4fa8'},
+  ask:'Morgen schreiben wir einen Englisch-Vokabeltest. Kann mir die KI beim Lernen helfen? Oder einfach meine Hausaufgaben machen?',
+  info:['Fotografiere Vokabeln und lass dich von der KI abfragen.',
+        'Die KI kann dir schwierige Aufgaben erklären.',
+        'Sie kann dir Fragen zu einem Thema stellen und überprüfen, ob du das Thema verstanden hast.'],
+  no:'Was du nicht tun solltest: Hausaufgaben von der KI lösen lassen. Dann hast du sie nämlich nicht verstanden, und das rächt sich in der nächsten Lernzielkontrolle!',
+  thanks:'Ich lass mich abfragen und mir Sachen erklären. Die Hausaufgaben mach ich selbst!',
+  quiz:[
+    {q:'Wie kann dir KI beim Vokabellernen helfen?', a:['Vokabeln fotografieren und dich abfragen lassen','Den Vokabeltest für dich schreiben','Die Vokabeln ins Gehirn laden','Das Vokabelheft verstecken'], e:'Abfragen lassen ist eine super Lernhilfe.'},
+    {q:'Was solltest du NICHT tun?', a:['Hausaufgaben von der KI lösen lassen','Dir eine schwierige Aufgabe erklären lassen','Dich abfragen lassen','Dir Übungsfragen stellen lassen'], e:'Wenn die KI die Hausaufgaben löst, lernst du selbst nichts.'},
+    {q:'Warum ist das keine gute Idee?', a:['Du verstehst den Stoff nicht, und das rächt sich in der nächsten Lernzielkontrolle.','Die KI wird sonst wütend.','Das Internet geht davon kaputt.','Hausaufgaben sind verboten.'], e:'In der Lernzielkontrolle hilft dir keine KI.'}],
+  exam:{q:'Welche Nutzung der KI ist beim Lernen sinnvoll?', a:['„Erklär mir diese Matheaufgabe Schritt für Schritt.“','„Löse alle Aufgaben auf Seite 34.“','„Schreib meinen Aufsatz.“','„Mach den Test für mich.“'], e:'Erklären lassen hilft dir, selbst zu verstehen.'}
+},
+{ id:'s6f', nr:'6', zone:'kreativ', topic:'Musik generieren', name:'DJ Zola', x:2470, y:1560,
+  mg:{type:'cloze', title:'Lückentext: Song mit KI',
+    intro:'Yo! In meinem Song-Rezept fehlen <b>3 Wörter</b>. Tippe sie ein oder tippe unten auf ein Wort.',
+    text:'1. Schreib deine [Ideen|Idee] für den Song auf.\n2. Sag der KI, ob der Song Pop oder [Rock|Rap|Hip-Hop|HipHop|Schlager|Techno|Jazz|Metal|Klassik|Reggae] sein soll.\n3. Gib alles in eine [Song-KI|Musik-KI|SongKI|KI] ein, zum Beispiel Suno.',
+    extra:['Passwort','Taschenrechner']},
+  look:{skin:'#6e3f22', hair:'#1d1208', hairStyle:'braids', shirt:'#2fd1c8', pants:'#2a2a4a', acc:'headphones', accColor:'#ff5a4d', shades:true},
+  ask:'Ich will einen Song über unsere Klassenfahrt machen. Aber ich kann gar kein Instrument spielen! Geht das mit KI?',
+  info:['Gib in die KI deine Ideen für einen Song ein, z. B. Wörter, Textbausteine, Thema.',
+        'Sag der KI, welche Stilrichtung der Song haben soll: Pop, Rock, Schlager …',
+        'Das fertige Song-Konzept kannst du dann bei einer speziellen KI für Songs eingeben, z. B. Suno.'],
+  thanks:'Klassenfahrt-Hit incoming! Ideen rein, Stil festlegen, ab in die Song-KI.',
+  quiz:[
+    {q:'Was gibst du der KI für einen Song?', a:['Ideen wie Wörter, Textbausteine und ein Thema','Nur deinen vollen Namen','Gar nichts','Deine Handynummer'], e:'Je mehr eigene Ideen du mitgibst, desto mehr wird es dein Song.'},
+    {q:'Was ist eine Stilrichtung?', a:['Zum Beispiel Pop, Rock oder Schlager','Die Lautstärke','Die Länge des Songs','Der Preis des Songs'], e:'Die Stilrichtung bestimmt, wie der Song klingt.'},
+    {q:'Wo wird aus dem Song-Konzept ein echter Song?', a:['Bei einer speziellen Song-KI, z. B. Suno','Im Taschenrechner','In der Wetter-App','Im Vokabelheft'], e:'Spezielle Musik-KIs machen aus dem Konzept einen Song.'}],
+  exam:{q:'In welcher Reihenfolge entsteht ein KI-Song?', a:['Ideen sammeln → Stil festlegen → Konzept in eine Song-KI eingeben','Song-KI öffnen → nichts eingeben → fertig','Stil festlegen → Song löschen → Ideen sammeln','Handy ausschalten → warten → Song ist da'], e:'Erst Ideen und Stil, dann macht die Song-KI daraus Musik.'}
+}
+];
+const KAI = {id:'kai', name:'KAI', x:1400, y:1140, robot:true};
+const EXAM_PASS = 8;
+const TEACHERS = [
+{ id:'t1', teacher:true, name:'WOL', x:710, y:1250,
+  look:{skin:'#f1c08f', hair:'#141018', hairStyle:'verylong', shirt:'#ff7eb6', pants:'#3a3a6a', acc:'none', accColor:'#1d1233', matcha:true},
+  hello:'Hallo! Wie schön, dass du vorbeischaust. Ich hab einen Tipp für dich:',
+  tips:['Bevor du etwas in eine KI eintippst, frag dich: Würde ich das auch auf ein Plakat im Schulflur schreiben? Wenn nicht, gehört es auch nicht in die KI.',
+        'Passwörter, Adressen und Telefonnummern bleiben immer bei dir. Keine KI braucht sie, um dir zu helfen.',
+        'Wenn dir eine KI-Antwort komisch vorkommt oder dich verunsichert, sprich mit einer Lehrkraft oder deinen Eltern darüber. Dafür sind wir da und keine Frage ist dumm!'],
+  bye:'Gern geschehen! Ich glaub an dich. Viel Erfolg beim KI-Führerschein!' },
+{ id:'t2', teacher:true, name:'MUE', x:850, y:1250,
+  look:{skin:'#f6d2b0', hair:'#6b3d1f', hairStyle:'verylong', shirt:'#ffb3d1', pants:'#2d3f8f', acc:'none', accColor:'#1d1233', matcha:true},
+  hello:'Hallo, wie schön, dass du da bist! Du machst das richtig toll hier. Ich möchte dir noch etwas mit auf den Weg geben:',
+  tips:['Lade keine Fotos von anderen Menschen in eine KI hoch. Jede und jeder hat ein Recht am eigenen Bild.',
+        'Viele KI-Dienste haben ein Mindestalter oder brauchen die Erlaubnis deiner Eltern. Frag zu Hause nach, bevor du dich irgendwo anmeldest.',
+        'Erstelle niemals Fake-Bilder oder gemeine Texte über Mitschülerinnen und Mitschüler. Das kann sehr verletzen und ist sogar verboten.'],
+  bye:'Prima, du machst das toll! Pass gut auf dich auf.' }
+];
+const ALL_NPCS = [...STATIONS, KAI, ...TEACHERS];
+// Herumlaufen: jede Person schlendert langsam um ihren Platz
+for(const n of [...STATIONS, ...TEACHERS]){ n.hx = n.x; n.hy = n.y; n.tx = n.x; n.ty = n.y; n.wait = Math.random()*3; n.face = 1; n.moving = false; n.R = n.teacher ? 18 : 48; n.sp = n.teacher ? 22 : 38; }
+function updateNPCs(dt){
+  for(const n of [...STATIONS, ...TEACHERS]){
+    if(Math.hypot(player.x-n.x, player.y-n.y) < 170){ n.moving = false; continue; }
+    if(n.wait > 0){ n.wait -= dt; n.moving = false; continue; }
+    const dx = n.tx-n.x, dy = n.ty-n.y, d = Math.hypot(dx,dy);
+    if(d < 2){ const a = Math.random()*Math.PI*2, r = n.R*(0.3+Math.random()*0.7); n.tx = n.hx + Math.cos(a)*r; n.ty = n.hy + Math.sin(a)*r*0.6; n.wait = 1.5 + Math.random()*3; n.moving = false; continue; }
+    const st = Math.min(d, n.sp*dt); n.x += dx/d*st; n.y += dy/d*st; n.moving = true;
+    if(Math.abs(dx) > 0.5) n.face = dx < 0 ? -1 : 1;
+  }
+}
+const LAST_ID = 's6a'; // Kiki erst zum Schluss
+function lockedLast(n){ return n.id===LAST_ID && !(save.st[n.id] && save.st[n.id].done) && STATIONS.some(s=>s.id!==LAST_ID && !(save.st[s.id] && save.st[s.id].done)); }
+
+/* ===================== SPIELSTAND ===================== */
+const KEY = 'ki-fs-arena-v3';
+let save = {name:'', char:0, st:{}, license:null};
+function loadSave(){ try{ const s = JSON.parse(localStorage.getItem(KEY)||'null'); if(s && typeof s==='object') save = Object.assign(save, s); }catch(e){} }
+function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(save)); }catch(e){} }
+const doneCount = () => STATIONS.filter(s => save.st[s.id] && save.st[s.id].done).length;
+const starCount = () => STATIONS.reduce((n,s)=> n + (save.st[s.id] ? save.st[s.id].stars : 0), 0);
+const allDone = () => doneCount() === STATIONS.length;
+
+/* ===================== FIGUREN ===================== */
+const HEROES = [
+  {name:'Flash', look:{skin:'#f1c08f', hair:'#5a2e12', hairStyle:'spiky', shirt:'#2b6ad8', pants:'#1d2a55', acc:'capFront', accColor:'#ff3b3b'}},
+  {name:'Nova',  look:{skin:'#c98b5e', hair:'#2a1a10', hairStyle:'buns', shirt:'#4fd43e', pants:'#2a2a55', acc:'headband', accColor:'#ffcf3a'}},
+  {name:'Rocco', look:{skin:'#8a5634', hair:'#1d1208', hairStyle:'short', shirt:'#ff8a1e', pants:'#3a2a55', acc:'headphones', accColor:'#2fd1c8'}},
+  {name:'Sunny', look:{skin:'#f6d2b0', hair:'#ffcf3a', hairStyle:'long', shirt:'#b05cff', pants:'#2a2a55', acc:'bandana', accColor:'#ff4fa8'}}
+];
+const INK = '#1d1233';
+
+function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function fs(ctx, fill, lw){ ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw||3; ctx.strokeStyle = INK; ctx.stroke(); }
+function circ(ctx,x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); }
+function ell(ctx,x,y,rx,ry){ ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2); }
+function shade(hex, f){ const n=parseInt(hex.slice(1),16); let r=n>>16,g=n>>8&255,b=n&255; r=Math.round(Math.min(255,Math.max(0,r*f))); g=Math.round(Math.min(255,Math.max(0,g*f))); b=Math.round(Math.min(255,Math.max(0,b*f))); return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }
+
+function drawHairBack(ctx, L){
+  const h = L.hair;
+  if(L.hairStyle==='long'){ rr(ctx,-24,-74,48,44,16); fs(ctx,h); }
+  if(L.hairStyle==='verylong'){ rr(ctx,-26,-76,52,62,18); fs(ctx,h); }
+  if(L.hairStyle==='ponytail'){ ell(ctx,22,-60,9,16); fs(ctx,h); }
+  if(L.hairStyle==='braids'){ for(const sx of [-1,1]){ for(let i=0;i<3;i++){ circ(ctx,sx*20,-56+i*9,6); fs(ctx,h,2.5);} } }
+  if(L.hairStyle==='afro'){ circ(ctx,0,-66,29); fs(ctx,h); }
+  if(L.hairStyle==='curly'){ for(const [cx,cy] of [[-22,-66],[22,-66],[-18,-80],[18,-80],[0,-86]]){ circ(ctx,cx,cy,10); fs(ctx,h,2.5);} }
+}
+function drawHairFront(ctx, L){
+  const h = L.hair, st = L.hairStyle;
+  ctx.save();
+  if(st==='short'||st==='long'||st==='verylong'||st==='ponytail'||st==='bob'||st==='bun'||st==='buns'||st==='braids'){
+    ctx.beginPath(); ctx.moveTo(-23,-62); ctx.bezierCurveTo(-25,-92,25,-92,23,-62); ctx.bezierCurveTo(14,-72,4,-70,-2,-74); ctx.bezierCurveTo(-8,-68,-16,-70,-23,-62); ctx.closePath(); fs(ctx,h);
+    if(st==='bob'){ rr(ctx,-25,-70,10,26,5); fs(ctx,h,2.5); rr(ctx,15,-70,10,26,5); fs(ctx,h,2.5); }
+    if(st==='bun'){ circ(ctx,0,-90,10); fs(ctx,h); }
+    if(st==='buns'){ circ(ctx,-17,-84,10); fs(ctx,h); circ(ctx,17,-84,10); fs(ctx,h); }
+  } else if(st==='spiky'){
+    ctx.beginPath(); ctx.moveTo(-24,-62); ctx.lineTo(-26,-80); ctx.lineTo(-16,-76); ctx.lineTo(-12,-93); ctx.lineTo(-2,-80); ctx.lineTo(6,-95); ctx.lineTo(12,-80); ctx.lineTo(24,-88); ctx.lineTo(22,-72); ctx.lineTo(25,-62); ctx.bezierCurveTo(10,-72,-10,-72,-24,-62); ctx.closePath(); fs(ctx,h);
+  } else if(st==='afro'){
+    ctx.beginPath(); ctx.arc(0,-70,24,Math.PI*1.05,Math.PI*1.95); ctx.bezierCurveTo(14,-70,-14,-70,-23,-76); ctx.closePath(); fs(ctx,h,2.5);
+  } else if(st==='curly'){
+    for(const [cx,cy] of [[-12,-82],[2,-85],[14,-80]]){ circ(ctx,cx,cy,9); fs(ctx,h,2.5); }
+  }
+  ctx.restore();
+}
+function drawAcc(ctx, L, t){
+  const c = L.accColor;
+  switch(L.acc){
+    case 'capBack': ctx.beginPath(); ctx.arc(0,-70,23,Math.PI,0); ctx.closePath(); fs(ctx,c); rr(ctx,-30,-74,14,7,3); fs(ctx,shade(c,.8),2.5); break;
+    case 'capFront': ctx.beginPath(); ctx.arc(0,-70,23,Math.PI,0); ctx.closePath(); fs(ctx,c); rr(ctx,8,-74,24,8,4); fs(ctx,shade(c,.8),2.5); circ(ctx,0,-92,3); fs(ctx,'#fff',2); break;
+    case 'beanie': ctx.beginPath(); ctx.arc(0,-72,24,Math.PI,0); ctx.closePath(); fs(ctx,c); rr(ctx,-25,-76,50,9,4); fs(ctx,shade(c,.8),2.5); circ(ctx,0,-97,6); fs(ctx,'#fff',2.5); break;
+    case 'headband': rr(ctx,-24,-79,48,8,4); fs(ctx,c,2.5); break;
+    case 'bandana': rr(ctx,-24,-80,48,10,5); fs(ctx,c,2.5); ctx.beginPath(); ctx.moveTo(-22,-74); ctx.lineTo(-34,-68); ctx.lineTo(-30,-78); ctx.closePath(); fs(ctx,c,2.5); break;
+    case 'helmet': ctx.beginPath(); ctx.arc(0,-70,25,Math.PI,0); ctx.closePath(); fs(ctx,c); rr(ctx,-29,-73,58,7,3); fs(ctx,shade(c,.8),2.5); rr(ctx,-3,-95,6,20,3); fs(ctx,shade(c,.85),2); break;
+    case 'headphones': ctx.lineWidth=5; ctx.strokeStyle=INK; ctx.beginPath(); ctx.arc(0,-64,25,Math.PI*1.08,Math.PI*1.92); ctx.stroke(); ctx.lineWidth=3; ctx.strokeStyle=c; ctx.stroke(); rr(ctx,-29,-68,10,16,5); fs(ctx,c,2.5); rr(ctx,19,-68,10,16,5); fs(ctx,c,2.5); break;
+    case 'goggles': rr(ctx,-24,-82,48,6,3); fs(ctx,'#555',2); circ(ctx,-9,-82,7); fs(ctx,c,2.5); circ(ctx,9,-82,7); fs(ctx,c,2.5); break;
+    case 'vr': rr(ctx,-20,-86,40,12,5); fs(ctx,c,2.5); rr(ctx,-15,-83,30,6,3); fs(ctx,'#2fd1c8',1.5); break;
+  }
+}
+function drawEyes(ctx, L, t, blink){
+  const ey = -60;
+  if(L.shades){ rr(ctx,-19,ey-6,17,11,4); fs(ctx,'#111',2.5); rr(ctx,2,ey-6,17,11,4); fs(ctx,'#111',2.5); ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(-15,ey-4,5,2); ctx.fillRect(6,ey-4,5,2); return; }
+  for(const sx of [-8,8]){
+    if(blink){ ctx.beginPath(); ctx.moveTo(sx-5,ey); ctx.lineTo(sx+5,ey); ctx.lineWidth=3; ctx.strokeStyle=INK; ctx.stroke(); continue; }
+    ell(ctx,sx,ey,5.5,7); fs(ctx,'#fff',2.5);
+    ell(ctx,sx+2,ey+1,3,4); ctx.fillStyle=INK; ctx.fill();
+    circ(ctx,sx+3,ey-1,1.2); ctx.fillStyle='#fff'; ctx.fill();
+  }
+  if(L.acc==='glasses'||L.acc==='glassesBig'){
+    const r = L.acc==='glassesBig'?9:7.5;
+    ctx.lineWidth=2.5; ctx.strokeStyle=L.accColor;
+    circ(ctx,-8,ey,r); ctx.stroke(); circ(ctx,8,ey,r); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8+r,ey); ctx.lineTo(8-r,ey); ctx.stroke();
+  }
+}
+// Zeichnet eine Figur mit Füßen bei (0,0) im aktuellen Koordinatensystem
+function drawCharBody(ctx, L, t, moving, face){
+  const bob = moving ? Math.abs(Math.sin(t*13))*3 : Math.sin(t*2.2)*1.2;
+  const leg = moving ? Math.sin(t*13)*5 : 0;
+  ctx.save(); ctx.scale(face<0?-1:1,1);
+  // Beine
+  rr(ctx,-11,-18+Math.max(0,leg)*-1,9,18,4); fs(ctx,L.pants,2.5);
+  rr(ctx,2,-18+Math.max(0,-leg)*-1,9,18,4); fs(ctx,L.pants,2.5);
+  rr(ctx,-13,-5-Math.max(0,leg),12,7,3); fs(ctx,'#fff',2.5);
+  rr(ctx,1,-5-Math.max(0,-leg),12,7,3); fs(ctx,'#fff',2.5);
+  ctx.translate(0,-bob);
+  drawHairBack(ctx,L);
+  // Arme
+  const sw = moving ? Math.sin(t*13)*4 : 0;
+  rr(ctx,-22,-42+sw,9,18,4); fs(ctx,L.coat?'#fff':shade(L.shirt,.9),2.5); circ(ctx,-17.5,-23+sw,5); fs(ctx,L.skin,2.5);
+  rr(ctx,13,-42-sw,9,18,4); fs(ctx,L.coat?'#fff':shade(L.shirt,.9),2.5); circ(ctx,17.5,-23-sw,5); fs(ctx,L.skin,2.5);
+  // Körper
+  rr(ctx,-15,-46,30,30,10); fs(ctx,L.shirt);
+  if(L.coat){ ctx.beginPath(); ctx.moveTo(0,-45); ctx.lineTo(0,-17); ctx.lineWidth=2; ctx.strokeStyle='#b8c2d8'; ctx.stroke(); rr(ctx,4,-38,7,6,2); fs(ctx,'#36a3ff',1.5); }
+  else { ctx.fillStyle='rgba(255,255,255,.22)'; rr(ctx,-11,-43,10,6,3); ctx.fill(); }
+  if(L.acc==='camera'){ ctx.beginPath(); ctx.moveTo(-12,-45); ctx.lineTo(0,-32); ctx.lineTo(12,-45); ctx.lineWidth=2; ctx.strokeStyle=INK; ctx.stroke(); rr(ctx,-8,-36,16,11,3); fs(ctx,'#333',2.5); circ(ctx,0,-30.5,3.5); fs(ctx,'#7fd0ff',1.5); }
+  if(L.matcha){ // kleiner Iced Matcha mit Deckel und Strohhalm
+    const cx = 20, cy = -sw;
+    ctx.beginPath(); ctx.moveTo(cx-7,-41+cy); ctx.lineTo(cx+7,-41+cy); ctx.lineTo(cx+5,-20+cy); ctx.lineTo(cx-5,-20+cy); ctx.closePath(); fs(ctx,'#a6d465',2.5);
+    ctx.fillStyle='#e9f6d2'; ctx.fillRect(cx-6,-38+cy,12,4);
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fillRect(cx-4,-33+cy,2.5,10);
+    ctx.beginPath(); ctx.moveTo(cx+2,-43+cy); ctx.lineTo(cx+5,-53+cy); ctx.lineWidth=4.5; ctx.strokeStyle=INK; ctx.stroke(); ctx.lineWidth=2.5; ctx.strokeStyle='#3f9e45'; ctx.stroke();
+    rr(ctx,cx-8,-45+cy,16,5,2); fs(ctx,'#ffffff',2);
+    circ(ctx,17,-28-sw,5); fs(ctx,L.skin,2.5);
+  }
+  if(L.book){ rr(ctx,14,-34-sw,14,17,2); fs(ctx,'#c0392b',2.5); }
+  if(L.acc==='spray'){ rr(ctx,15,-38-sw,9,16,3); fs(ctx,L.accColor,2.5); rr(ctx,17,-42-sw,5,5,1); fs(ctx,'#fff',2); }
+  // Kopf
+  circ(ctx,0,-62,23); fs(ctx,L.skin);
+  ctx.fillStyle='rgba(255,120,120,.35)'; ell(ctx,-14,-53,4,2.5); ctx.fill(); ell(ctx,14,-53,4,2.5); ctx.fill();
+  const blink = (t % 3.7) < 0.12;
+  drawEyes(ctx,L,t,blink);
+  ctx.beginPath(); ctx.arc(1,-50,5,0.15*Math.PI,0.85*Math.PI); ctx.lineWidth=2.5; ctx.strokeStyle=INK; ctx.stroke();
+  drawHairFront(ctx,L);
+  drawAcc(ctx,L,t);
+  ctx.restore();
+}
+function drawRobot(ctx, t){
+  const bob = Math.sin(t*2.4)*2;
+  ctx.save(); ctx.translate(0,-bob);
+  // Füße
+  rr(ctx,-16,-10,13,10,4); fs(ctx,'#cfd8ff',2.5); rr(ctx,3,-10,13,10,4); fs(ctx,'#cfd8ff',2.5);
+  // Arme
+  rr(ctx,-30,-44,11,22,5); fs(ctx,'#e8eeff',2.5); circ(ctx,-24.5,-20,6); fs(ctx,'#36a3ff',2.5);
+  rr(ctx,19,-50,11,22,5); fs(ctx,'#e8eeff',2.5); circ(ctx,24.5,-52,6); fs(ctx,'#36a3ff',2.5);
+  // Körper
+  rr(ctx,-20,-50,40,40,12); fs(ctx,'#f4f7ff');
+  rr(ctx,-11,-40,22,16,5); fs(ctx,'#1a5fb8',2.5);
+  ctx.fillStyle='#fff'; ctx.font='14px "Lilita One", Impact, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('KI',0,-31.5);
+  // Kopf
+  rr(ctx,-24,-92,48,40,16); fs(ctx,'#f4f7ff');
+  rr(ctx,-18,-85,36,25,10); fs(ctx,'#14204f',2.5);
+  const glow = 0.75 + Math.sin(t*4)*0.25;
+  ctx.fillStyle=`rgba(80,230,255,${glow})`;
+  ell(ctx,-8,-73,5,6); ctx.fill(); ell(ctx,8,-73,5,6); ctx.fill();
+  ctx.beginPath(); ctx.arc(0,-68,5,0.2*Math.PI,0.8*Math.PI); ctx.lineWidth=2; ctx.strokeStyle='#50e6ff'; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,-92); ctx.lineTo(0,-102); ctx.lineWidth=3; ctx.strokeStyle=INK; ctx.stroke();
+  circ(ctx,0,-105,5); fs(ctx,'#ffcf3a',2.5);
+  circ(ctx,-25,-72,5); fs(ctx,'#36a3ff',2.5); circ(ctx,25,-72,5); fs(ctx,'#36a3ff',2.5);
+  ctx.restore();
+}
+function paintPortrait(cv, who, big){
+  const dpr = Math.min(2, window.devicePixelRatio||1);
+  const size = cv.clientWidth || 96;
+  cv.width = size*dpr; cv.height = size*dpr;
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  const g = ctx.createRadialGradient(size/2,size*.35,size*.1,size/2,size/2,size*.75);
+  const zc = who.zone ? ZONES[who.zone].color : (who.robot ? '#36a3ff' : who.teacher ? '#ff7eb6' : '#ffcf3a');
+  g.addColorStop(0, shade(zc,1.35)); g.addColorStop(1, zc);
+  ctx.fillStyle=g; ctx.fillRect(0,0,size,size);
+  ctx.fillStyle='rgba(255,255,255,.18)'; for(let i=0;i<6;i++){ ctx.beginPath(); ctx.moveTo(size/2,size*.45); ctx.arc(size/2,size*.45,size,i*Math.PI/3,i*Math.PI/3+Math.PI/7); ctx.fill(); }
+  const s = size/62;
+  ctx.save(); ctx.translate(size/2, who.robot ? size*1.42 : size*1.48); ctx.scale(s,s);
+  if(who.robot) drawRobot(ctx,0); else drawCharBody(ctx, who.look, 0.5, false, 1);
+  ctx.restore();
+}
+
+/* ===================== WELT ===================== */
+const W = 2800, H = 2100, BORDER = 70;
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const PLAZA = {x:1170, y:860, w:460, h:380};
+const GATE = {x:1355, w:90};
+const POND = {x:130, y:880, w:300, h:230};
+const SPAWN = {x:1400, y:1400};
+const PATHS = [
+    [[1400,1250],[1400,1420]],
+    [[1400,1420],[1030,1560],[680,1880]],[[1030,1560],[330,1560]],
+    [[1400,1420],[1770,1560],[2120,1880]],[[1770,1560],[2470,1560]],
+    [[1400,1420],[980,1300],[760,900],[880,620],[430,380]],
+    [[1400,1420],[1820,1300],[2020,980],[1980,720],[1900,340]],[[1980,720],[2400,470]]
+];
+
+const obstacles = []; // {type,x,y,w,h,solid}
+const bushes = [];
+function addFenceH(x,y,len){ obstacles.push({type:'fenceH',x,y,w:len,h:14,solid:true}); }
+function addFenceV(x,y,len){ obstacles.push({type:'fenceV',x,y,w:14,h:len,solid:true}); }
+function buildWorld(){
+  const P = PLAZA;
+  addFenceH(P.x, P.y, P.w);
+  addFenceV(P.x, P.y, P.h);
+  addFenceV(P.x+P.w-14, P.y, P.h);
+  addFenceH(P.x, P.y+P.h-14, GATE.x-P.x);
+  addFenceH(GATE.x+GATE.w, P.y+P.h-14, P.x+P.w-GATE.x-GATE.w);
+  obstacles.push({type:'crate',x:P.x+24,y:P.y+30,w:56,h:56,solid:true});
+  obstacles.push({type:'crate',x:P.x+P.w-80,y:P.y+30,w:56,h:56,solid:true});
+  obstacles.push({type:'barrel',x:P.x+28,y:P.y+P.h-80,w:44,h:44,solid:true});
+  obstacles.push({type:'barrel',x:P.x+P.w-72,y:P.y+P.h-80,w:44,h:44,solid:true});
+  obstacles.push({type:'pond',x:POND.x,y:POND.y,w:POND.w,h:POND.h,solid:true,hidden:true});
+  // Zufällige, aber immer gleiche Deko-Gruppen
+  const rnd = mulberry32(20261021);
+  const keep = [...STATIONS.map(s=>({x:s.x,y:s.y,r:170})), {x:SPAWN.x,y:SPAWN.y,r:170}, {x:1400,y:1310,r:120}, {x:780,y:1250,r:200}];
+  for(const pth of PATHS) for(let i=0;i<pth.length-1;i++){ const [ax,ay]=pth[i],[bx,by]=pth[i+1], n=Math.ceil(Math.hypot(bx-ax,by-ay)/50); for(let k=0;k<=n;k++) keep.push({x:ax+(bx-ax)*k/n, y:ay+(by-ay)*k/n, r:80}); }
+  const boxes = [];
+  const rectHit = (a,b,m)=> a.x-m < b.x+b.w && a.x+a.w+m > b.x && a.y-m < b.y+b.h && a.y+a.h+m > b.y;
+  const forbidden = [{x:PLAZA.x-110,y:PLAZA.y-110,w:PLAZA.w+220,h:PLAZA.h+180},{x:POND.x-60,y:POND.y-60,w:POND.w+120,h:POND.h+120}];
+  const okBox = (b, m) => {
+    if(b.x < BORDER+40 || b.y < BORDER+60 || b.x+b.w > W-BORDER-40 || b.y+b.h > H-BORDER-40) return false;
+    for(const k of keep){ const cx=Math.max(b.x,Math.min(k.x,b.x+b.w)), cy=Math.max(b.y,Math.min(k.y,b.y+b.h)); if((cx-k.x)**2+(cy-k.y)**2 < k.r*k.r) return false; }
+    for(const f of forbidden) if(rectHit(b,f,0)) return false;
+    for(const o of boxes) if(rectHit(b,o,m)) return false;
+    return true;
+  };
+  let tries = 0, placed = 0;
+  while(placed < 58 && tries < 3000){
+    tries++;
+    const x = BORDER + rnd()*(W-2*BORDER), y = BORDER + rnd()*(H-2*BORDER);
+    const kind = rnd();
+    if(kind < .26){ // Grasfeld
+      const b = {x, y, w:130+rnd()*130, h:100+rnd()*90};
+      if(!okBox(b, 40)) continue;
+      boxes.push(b); bushes.push(b); placed++;
+    } else if(kind < .48){ // Kisten-Reihe
+      const n = 2+Math.floor(rnd()*2), vert = rnd()<.4, s = 56;
+      const b = {x,y,w:vert?s:s*n,h:vert?s*n:s};
+      if(!okBox(b, 75)) continue;
+      boxes.push(b);
+      for(let i=0;i<n;i++) obstacles.push({type: rnd()<.25?'crateDark':'crate', x: x+(vert?0:i*s), y: y+(vert?i*s:0), w:s, h:s, solid:true});
+      placed++;
+    } else if(kind < .62){ // Fässer
+      const b = {x,y,w:96,h:46};
+      if(!okBox(b, 75)) continue;
+      boxes.push(b);
+      obstacles.push({type:'barrel',x,y,w:44,h:44,solid:true});
+      obstacles.push({type:'barrel',x:x+50,y:y+2,w:44,h:44,solid:true});
+      placed++;
+    } else if(kind < .82){ // Zaun (L-Form)
+      const len = 144+Math.floor(rnd()*3)*48, down = rnd()<.5 ? 96+Math.floor(rnd()*2)*48 : 0;
+      const b = {x,y,w:len,h:Math.max(14,down)};
+      if(!okBox(b, 80)) continue;
+      boxes.push(b); addFenceH(x,y,len); if(down) addFenceV(rnd()<.5?x:x+len-14,y,down);
+      placed++;
+    } else if(kind < .92){ // Kaktus
+      const b = {x,y,w:40,h:34};
+      if(!okBox(b, 70)) continue;
+      boxes.push(b); obstacles.push({type:'cactus',x,y,w:40,h:34,solid:true}); placed++;
+    } else { // Felsen
+      const b = {x,y,w:76,h:52};
+      if(!okBox(b, 75)) continue;
+      boxes.push(b); obstacles.push({type:'rock',x,y,w:76,h:52,solid:true,seed:rnd()}); placed++;
+    }
+  }
+  // Schriftzüge der Zonen frei halten: Hindernisse leicht zur Seite, Grasfelder leicht nach unten schieben
+  const LABEL_RECTS = [{x:470,y:132,w:460,h:76},{x:1680,y:132,w:880,h:76},{x:1080,y:1682,w:640,h:76}];
+  for(const L of LABEL_RECTS){
+    for(const o of obstacles){ if(o.type==='pond' || o.x < PLAZA.x+PLAZA.w && o.x+o.w > PLAZA.x && o.y < PLAZA.y+PLAZA.h && o.y+o.h > PLAZA.y) continue;
+      if(rectHit(o,L,0)){ const left = o.x+o.w-L.x, right = L.x+L.w-o.x; o.x += left < right ? -(left+44) : (right+44); } }
+    for(const b of bushes){ if(rectHit(b,L,0)) b.y = L.y+L.h+14; }
+  }
+  for(const b of bushes) b.img = renderBush(b, rnd);
+}
+
+/* Boden einmal vorzeichnen */
+let groundCanvas = null;
+function buildGround(){
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const rnd = mulberry32(42);
+  g.fillStyle = '#e8a76a'; g.fillRect(0,0,W,H);
+  for(let i=0;i<260;i++){ g.fillStyle = rnd()<.5 ? 'rgba(255,220,170,.10)' : 'rgba(150,80,30,.07)'; ell(g, rnd()*W, rnd()*H, 60+rnd()*160, 40+rnd()*110); g.fill(); }
+  // Wege
+  g.lineCap='round'; g.lineJoin='round';
+  const paths = PATHS;
+  for(const [w,col] of [[96,'rgba(196,120,64,.35)'],[80,'rgba(246,200,150,.75)']]){
+    g.lineWidth = w; g.strokeStyle = col;
+    for(const p of paths){ g.beginPath(); g.moveTo(p[0][0],p[0][1]); for(let i=1;i<p.length-1;i++){ const mx=(p[i][0]+p[i+1][0])/2, my=(p[i][1]+p[i+1][1])/2; g.quadraticCurveTo(p[i][0],p[i][1],mx,my);} const L=p[p.length-1]; g.lineTo(L[0],L[1]); g.stroke(); }
+  }
+  // Steinplatten
+  const inside = (x,y,r)=> (x>PLAZA.x-r && x<PLAZA.x+PLAZA.w+r && y>PLAZA.y-r && y<PLAZA.y+PLAZA.h+r) || (x>POND.x-r && x<POND.x+POND.w+r && y>POND.y-r && y<POND.y+POND.h+r);
+  for(let i=0;i<620;i++){
+    const x = BORDER+rnd()*(W-2*BORDER), y = BORDER+rnd()*(H-2*BORDER), r = 12+rnd()*20;
+    if(inside(x,y,r+10)) continue;
+    const n = 5 + (rnd()<.4?1:0), rot = rnd()*Math.PI;
+    g.beginPath(); for(let k=0;k<n;k++){ const a = rot + k/n*Math.PI*2, rr2 = r*(0.8+rnd()*0.3); g.lineTo(x+Math.cos(a)*rr2, y+Math.sin(a)*rr2*0.8); } g.closePath();
+    g.fillStyle = rnd()<.7 ? '#f0b97f' : '#d99258'; g.fill(); g.lineWidth=2.5; g.strokeStyle='rgba(160,90,40,.55)'; g.stroke();
+  }
+  for(let i=0;i<900;i++){ g.fillStyle='rgba(120,60,20,.22)'; circ(g, rnd()*W, rnd()*H, 1.5+rnd()*2.5); g.fill(); }
+  // Stations-Plätze
+  for(const s of STATIONS){
+    const c = ZONES[s.zone].color;
+    g.save(); g.globalAlpha=.9;
+    ell(g,s.x,s.y+4,92,62); g.fillStyle='rgba(120,60,20,.25)'; g.fill();
+    ell(g,s.x,s.y,88,58); g.fillStyle=shade(c,1.25); g.fill(); g.lineWidth=5; g.strokeStyle=shade(c,.7); g.stroke();
+    g.setLineDash([14,10]); ell(g,s.x,s.y,70,44); g.lineWidth=3; g.strokeStyle='rgba(255,255,255,.7)'; g.stroke(); g.setLineDash([]);
+    g.restore();
+    g.font='22px "Lilita One", Impact, sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+    g.fillStyle='rgba(255,255,255,.85)'; g.fillText(s.nr, s.x+64, s.y+40);
+  }
+  g.save(); ell(g,780,1257,138,58); g.fillStyle='rgba(120,60,20,.25)'; g.fill(); ell(g,780,1253,134,54); g.fillStyle='#ffc2dc'; g.fill(); g.lineWidth=5; g.strokeStyle='#d6589a'; g.stroke(); g.restore();
+  // Prüfungsplatz
+  const P = PLAZA;
+  g.fillStyle='#b9c6e6'; g.fillRect(P.x,P.y,P.w,P.h);
+  for(let yy=P.y; yy<P.y+P.h; yy+=46) for(let xx=P.x; xx<P.x+P.w; xx+=46){ g.fillStyle = ((xx-P.x)/46+(yy-P.y)/46)%2<1 ? '#c9d5f0' : '#adbbe0'; g.fillRect(xx,yy,46,46); }
+  g.lineWidth=2; g.strokeStyle='rgba(60,80,140,.35)'; for(let yy=P.y; yy<=P.y+P.h; yy+=46){ g.beginPath(); g.moveTo(P.x,yy); g.lineTo(P.x+P.w,yy); g.stroke(); } for(let xx=P.x; xx<=P.x+P.w; xx+=46){ g.beginPath(); g.moveTo(xx,P.y); g.lineTo(xx,P.y+P.h); g.stroke(); }
+  // KI-Emblem
+  g.save(); g.translate(1400,1010);
+  g.beginPath(); g.moveTo(0,-110); g.lineTo(100,-74); g.lineTo(100,20); g.lineTo(0,96); g.lineTo(-100,20); g.lineTo(-100,-74); g.closePath();
+  g.fillStyle='#2a5fd0'; g.fill(); g.lineWidth=8; g.strokeStyle='#13235e'; g.stroke();
+  g.fillStyle='#fff'; g.font='92px "Lilita One", Impact, sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('KI',0,-12);
+  g.restore();
+  ell(g,1400,1150,56,22); g.fillStyle='#ffcf3a'; g.fill(); g.lineWidth=5; g.strokeStyle='#13235e'; g.stroke();
+  // Teich
+  const Q = POND;
+  g.save(); rr(g,Q.x-14,Q.y-14,Q.w+28,Q.h+28,70); g.fillStyle='#c98a52'; g.fill();
+  rr(g,Q.x,Q.y,Q.w,Q.h,60); g.fillStyle='#38b4ea'; g.fill(); g.lineWidth=6; g.strokeStyle='#1d6fa8'; g.stroke();
+  g.clip(); g.strokeStyle='rgba(255,255,255,.55)'; g.lineWidth=4;
+  for(let i=0;i<14;i++){ const x=Q.x+20+rnd()*(Q.w-60), y=Q.y+20+rnd()*(Q.h-40); g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+12,y-7,x+24,y); g.quadraticCurveTo(x+36,y+7,x+48,y); g.stroke(); }
+  g.restore();
+  // Zonen-Schriftzüge
+  g.font='64px "Lilita One", Impact, sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  const label = (txt,x,y,col)=>{ g.save(); g.globalAlpha=.42; g.lineWidth=10; g.strokeStyle='rgba(120,60,20,.5)'; g.strokeText(txt,x,y); g.fillStyle=col; g.fillText(txt,x,y); g.restore(); };
+  label('GRUNDWISSEN', 700, 170, '#ffffff');
+  label('SICHERHEIT & DATENSCHUTZ', 2120, 170, '#ffffff');
+  label('KREATIV-WERKSTATT', 1400, 1720, '#ffffff');
+  // Felsrand
+  g.fillStyle='#b4553a';
+  g.fillRect(0,0,W,BORDER); g.fillRect(0,H-BORDER,W,BORDER); g.fillRect(0,0,BORDER,H); g.fillRect(W-BORDER,0,BORDER,H);
+  for(let i=0;i<260;i++){
+    const side = Math.floor(rnd()*4); let x,y;
+    if(side===0){x=rnd()*W;y=rnd()*BORDER;} else if(side===1){x=rnd()*W;y=H-rnd()*BORDER;} else if(side===2){x=rnd()*BORDER;y=rnd()*H;} else {x=W-rnd()*BORDER;y=rnd()*H;}
+    g.fillStyle = rnd()<.5 ? '#c9684a' : '#94402b'; ell(g,x,y,14+rnd()*22,10+rnd()*14); g.fill();
+  }
+  g.lineWidth=10; g.strokeStyle='rgba(80,30,15,.45)'; g.strokeRect(BORDER-2,BORDER-2,W-2*BORDER+4,H-2*BORDER+4);
+  g.lineWidth=4; g.strokeStyle='#6e2c1a'; g.strokeRect(BORDER,BORDER,W-2*BORDER,H-2*BORDER);
+  groundCanvas = cv;
+}
+function renderBush(b, rnd){
+  const pad = 14, top = 34;
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(b.w+pad*2); cv.height = Math.ceil(b.h+pad+top);
+  const g = cv.getContext('2d');
+  rr(g,pad-4,top+8,b.w+8,b.h,24); g.fillStyle='rgba(110,50,10,.35)'; g.fill();
+  const rows = Math.max(3, Math.round(b.h/22)), cols = Math.max(3, Math.round(b.w/20));
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const x = pad + (c+0.5)*(b.w/cols) + (rnd()-0.5)*8, y = top + (r+0.8)*(b.h/rows);
+    const hgt = 24 + rnd()*12;
+    for(let k=-2;k<=2;k++){
+      g.beginPath(); g.moveTo(x+k*3,y); g.quadraticCurveTo(x+k*5,y-hgt*0.6,x+k*7+(rnd()-0.5)*4,y-hgt);
+      g.lineWidth=6; g.strokeStyle='#b8560f'; g.lineCap='round'; g.stroke();
+    }
+    for(let k=-2;k<=2;k++){
+      g.beginPath(); g.moveTo(x+k*3,y); g.quadraticCurveTo(x+k*5,y-hgt*0.6,x+k*7,y-hgt+2);
+      g.lineWidth=3.5; g.strokeStyle = k%2 ? '#ffcf3f' : '#ffa62b'; g.stroke();
+    }
+  }
+  return {cv, ox:b.x-pad, oy:b.y-top};
+}
+
+/* ===================== OBJEKTE ZEICHNEN ===================== */
+function drawCrate(ctx,o){
+  const H2 = 26, dark = o.type==='crateDark';
+  const top = dark?'#9a6a44':'#e39b52', front = dark?'#6e4528':'#b5672e', line = dark?'#4a2c18':'#7a3f18';
+  ctx.fillStyle='rgba(90,40,10,.3)'; rr(ctx,o.x+4,o.y+6,o.w,o.h,6); ctx.fill();
+  rr(ctx,o.x,o.y+o.h-H2,o.w,H2,5); fs(ctx,front,3);
+  rr(ctx,o.x,o.y-H2,o.w,o.h,6); fs(ctx,top,3);
+  ctx.lineWidth=3; ctx.strokeStyle=line;
+  ctx.beginPath(); ctx.moveTo(o.x+8,o.y-H2+8); ctx.lineTo(o.x+o.w-8,o.y+o.h-H2-8); ctx.moveTo(o.x+o.w-8,o.y-H2+8); ctx.lineTo(o.x+8,o.y+o.h-H2-8); ctx.stroke();
+  ctx.strokeRect(o.x+6,o.y-H2+6,o.w-12,o.h-12);
+  ctx.beginPath(); ctx.moveTo(o.x+4,o.y+o.h-H2/2); ctx.lineTo(o.x+o.w-4,o.y+o.h-H2/2); ctx.stroke();
+}
+function drawBarrel(ctx,o){
+  const cx=o.x+o.w/2, H2=30;
+  ctx.fillStyle='rgba(90,40,10,.3)'; ell(ctx,cx+4,o.y+o.h-4,o.w/2+2,12); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(o.x,o.y+o.h/2-H2); ctx.lineTo(o.x,o.y+o.h-10); ctx.ellipse(cx,o.y+o.h-10,o.w/2,11,0,Math.PI,0,true); ctx.lineTo(o.x+o.w,o.y+o.h/2-H2); ctx.closePath(); fs(ctx,'#b9692f',3);
+  ctx.lineWidth=4; ctx.strokeStyle='#5a3a24';
+  for(const yy of [o.y+o.h/2-H2+14, o.y+o.h-20]){ ctx.beginPath(); ctx.ellipse(cx,yy,o.w/2,10,0,0,Math.PI); ctx.stroke(); }
+  ell(ctx,cx,o.y+o.h/2-H2,o.w/2,12); fs(ctx,'#e09a5a',3);
+  ell(ctx,cx,o.y+o.h/2-H2,o.w/2-8,7); ctx.lineWidth=2; ctx.strokeStyle='#9a5a2a'; ctx.stroke();
+}
+function drawFence(ctx,o){
+  const post = (px,py)=>{ rr(ctx,px-7,py-34,14,40,4); fs(ctx,'#a8652f',3); rr(ctx,px-7,py-34,14,9,4); fs(ctx,'#e0a060',2.5); };
+  if(o.type==='fenceH'){
+    ctx.fillStyle='rgba(90,40,10,.25)'; ctx.fillRect(o.x,o.y+8,o.w,10);
+    for(const ry of [-24,-12]){ rr(ctx,o.x+2,o.y+ry,o.w-4,9,3); fs(ctx,'#cf8a48',2.5); }
+    const n = Math.max(1,Math.round(o.w/48));
+    for(let i=0;i<=n;i++) post(o.x+7+i*(o.w-14)/n, o.y+8);
+  } else {
+    ctx.fillStyle='rgba(90,40,10,.25)'; ctx.fillRect(o.x+6,o.y,10,o.h+8);
+    rr(ctx,o.x+2,o.y-24,10,o.h,3); fs(ctx,'#cf8a48',2.5);
+    const n = Math.max(1,Math.round(o.h/48));
+    for(let i=0;i<=n;i++) post(o.x+7, o.y+8+i*(o.h-14)/n);
+  }
+}
+function drawCactus(ctx,o){
+  const cx=o.x+o.w/2, by=o.y+o.h;
+  ctx.fillStyle='rgba(90,40,10,.3)'; ell(ctx,cx+4,by-4,24,9); ctx.fill();
+  rr(ctx,cx-30,by-58,14,26,7); fs(ctx,'#3caa4a',3);
+  rr(ctx,cx+16,by-70,14,30,7); fs(ctx,'#3caa4a',3);
+  rr(ctx,cx-13,by-82,26,80,13); fs(ctx,'#4cc95a',3);
+  ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(cx-4,by-74); ctx.lineTo(cx-4,by-12); ctx.stroke();
+  circ(ctx,cx+2,by-84,5); fs(ctx,'#ff5aa0',2);
+}
+function drawRock(ctx,o){
+  const cx=o.x+o.w/2, cy=o.y+o.h/2;
+  ctx.fillStyle='rgba(90,40,10,.3)'; ell(ctx,cx+5,cy+14,o.w/2+4,o.h/2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(o.x,cy+12); ctx.lineTo(o.x+8,o.y-14); ctx.lineTo(cx-6,o.y-30); ctx.lineTo(o.x+o.w-10,o.y-20); ctx.lineTo(o.x+o.w,cy+6); ctx.lineTo(o.x+o.w-12,o.y+o.h); ctx.lineTo(o.x+10,o.y+o.h); ctx.closePath(); fs(ctx,'#a4583c',3);
+  ctx.beginPath(); ctx.moveTo(o.x+10,o.y-8); ctx.lineTo(cx-6,o.y-26); ctx.lineTo(o.x+o.w-12,o.y-16); ctx.lineTo(cx+4,o.y+4); ctx.closePath(); ctx.fillStyle='#c9734f'; ctx.fill();
+}
+
+/* ===================== ZUSTAND & EINGABE ===================== */
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const mm = document.getElementById('minimap'), mctx = mm.getContext('2d');
+let cw=0, ch=0, dpr=1, zoom=1;
+const player = {x:SPAWN.x, y:SPAWN.y, r:18, face:1, moving:false};
+const camera = {x:SPAWN.x, y:SPAWN.y};
+const keys = {};
+const joy = {active:false, id:null, ox:0, oy:0, dx:0, dy:0};
+let paused = true, near = null, t0 = performance.now(), time = 0;
+let particles = [], guideTarget = null, barrierAnim = 0, wasUnlocked = false;
+
+function resize(){
+  dpr = Math.min(2, window.devicePixelRatio||1);
+  cw = window.innerWidth; ch = window.innerHeight;
+  cv.width = Math.round(cw*dpr); cv.height = Math.round(ch*dpr);
+  zoom = Math.max(0.5, Math.min(1.3, Math.min(cw/1050, ch/640)));
+}
+window.addEventListener('resize', resize);
+
+window.addEventListener('keydown', e=>{
+  if(document.activeElement && document.activeElement.tagName==='INPUT') return;
+  const k = e.key.toLowerCase();
+  if(!document.getElementById('glossary').hidden){ if(k==='escape') closeGlossary(); return; }
+  if(!document.getElementById('dialog').hidden || !document.getElementById('overview').hidden){
+    if(k==='escape'){ closeDialog(); closeOverview(); return; }
+    if(MG && MG.key && !document.getElementById('dialog').hidden) MG.key(k);
+    return;
+  }
+  if(!document.getElementById('start').hidden) return;
+  keys[k] = true;
+  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  if(k==='e' || k===' ' || k==='enter') interact();
+  if(k==='m') openOverview();
+});
+window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
+window.addEventListener('blur', ()=>{ for(const k in keys) keys[k]=false; });
+
+function screenToWorld(sx,sy){ return {x:(sx-cw/2)/zoom+camera.x, y:(sy-ch/2)/zoom+camera.y}; }
+cv.addEventListener('pointerdown', e=>{
+  if(paused) return;
+  const w = screenToWorld(e.clientX,e.clientY);
+  for(const n of ALL_NPCS){
+    if(Math.hypot(w.x-n.x, w.y-(n.y-40)) < 50){
+      if(Math.hypot(player.x-n.x, player.y-n.y) < 260){ openTalk(n); return; }
+      toast('Lauf näher zu '+n.name+'!'); guideTarget = n; return;
+    }
+  }
+  if(joy.active) return;
+  joy.active = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = 0; joy.dy = 0;
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+});
+cv.addEventListener('pointermove', e=>{
+  if(!joy.active || e.pointerId!==joy.id) return;
+  let dx = e.clientX-joy.ox, dy = e.clientY-joy.oy; const d = Math.hypot(dx,dy), max = 56;
+  if(d>max){ joy.ox += dx*(1-max/d); joy.oy += dy*(1-max/d); dx = e.clientX-joy.ox; dy = e.clientY-joy.oy; }
+  joy.dx = dx/max; joy.dy = dy/max;
+});
+const endJoy = e=>{ if(e.pointerId===joy.id){ joy.active=false; joy.dx=joy.dy=0; joy.id=null; } };
+cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
+
+/* ===================== SPIELLOGIK ===================== */
+function solids(){
+  const list = obstacles.filter(o=>o.solid);
+  if(!allDone()) list.push({x:GATE.x, y:PLAZA.y+PLAZA.h-16, w:GATE.w, h:18});
+  return list;
+}
+function resolve(px,py,r){
+  for(const o of solids()){
+    const cx = Math.max(o.x, Math.min(px, o.x+o.w)), cy = Math.max(o.y, Math.min(py, o.y+o.h));
+    let dx = px-cx, dy = py-cy; const d2 = dx*dx+dy*dy;
+    if(d2 < r*r){
+      if(d2 > 0.0001){ const d = Math.sqrt(d2); px += dx/d*(r-d); py += dy/d*(r-d); }
+      else { const l=px-o.x, rr2=o.x+o.w-px, t=py-o.y, b=o.y+o.h-py, m=Math.min(l,rr2,t,b);
+        if(m===l) px=o.x-r; else if(m===rr2) px=o.x+o.w+r; else if(m===t) py=o.y-r; else py=o.y+o.h+r; }
+    }
+  }
+  for(const n of ALL_NPCS){
+    const dx = px-n.x, dy = py-n.y, d = Math.hypot(dx,dy), R = r+20;
+    if(d < R && d > 0.01){ px += dx/d*(R-d); py += dy/d*(R-d); }
+  }
+  px = Math.max(BORDER+r, Math.min(W-BORDER-r, px)); py = Math.max(BORDER+r+10, Math.min(H-BORDER-r, py));
+  return [px,py];
+}
+function update(dt){
+  updateNPCs(dt);
+  let ix = 0, iy = 0;
+  if(keys['a']||keys['arrowleft']) ix -= 1; if(keys['d']||keys['arrowright']) ix += 1;
+  if(keys['w']||keys['arrowup']) iy -= 1; if(keys['s']||keys['arrowdown']) iy += 1;
+  if(joy.active){ ix += joy.dx; iy += joy.dy; }
+  let m = Math.hypot(ix,iy); if(m>1){ ix/=m; iy/=m; m=1; }
+  player.moving = !paused && m > 0.12;
+  if(player.moving){
+    const sp = 270;
+    const steps = 3;
+    for(let i=0;i<steps;i++){ const r = resolve(player.x + ix*sp*dt/steps, player.y + iy*sp*dt/steps, player.r); player.x=r[0]; player.y=r[1]; }
+    if(Math.abs(ix)>0.15) player.face = ix<0?-1:1;
+  }
+  camera.x += (player.x-camera.x)*Math.min(1,dt*8); camera.y += (player.y-40-camera.y)*Math.min(1,dt*8);
+  const vw = cw/zoom/2, vh = ch/zoom/2;
+  camera.x = W > vw*2 ? Math.max(vw, Math.min(W-vw, camera.x)) : W/2;
+  camera.y = H > vh*2 ? Math.max(vh, Math.min(H-vh, camera.y)) : H/2;
+  // nächste Person
+  let best = null, bd = 1e9;
+  for(const n of ALL_NPCS){ const d = Math.hypot(player.x-n.x, player.y-n.y); const lim = n.robot?150:105; if(d<lim && d<bd){ bd=d; best=n; } }
+  if(best !== near){ near = best; updateAct(); }
+  for(const p of particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=380*dt; p.life-=dt; }
+  particles = particles.filter(p=>p.life>0);
+  if(allDone() && !wasUnlocked){ wasUnlocked = true; barrierAnim = 1; toast('Das Tor zum Prüfungsplatz ist offen! Geh zu KAI.'); burst(1400,1240,'#50e6ff',40); guideTarget = KAI; }
+  barrierAnim = Math.max(0, barrierAnim - dt);
+  if(guideTarget && Math.hypot(player.x-guideTarget.x, player.y-guideTarget.y) < 140) guideTarget = null;
+}
+function updateAct(){
+  const b = document.getElementById('actBtn');
+  b.classList.toggle('off', !near); b.classList.toggle('pulse', !!near);
+  document.getElementById('actName').textContent = near ? near.name : 'niemand da';
+  b.setAttribute('aria-label', near ? 'Mit '+near.name+' sprechen' : 'Niemand in der Nähe');
+}
+function interact(){ if(!paused && near) openTalk(near); }
+document.getElementById('actBtn').addEventListener('click', ()=>{ if(near) openTalk(near); else toast('Lauf zu einer Person mit „?“ über dem Kopf.'); });
+function burst(x,y,col,n){ for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, s=120+Math.random()*260; particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-200,life:.7+Math.random()*.5,col: i%3? col : '#ffd23a', r:3+Math.random()*4}); } }
+
+/* ===================== RENDERN ===================== */
+function numBadge(x,y,name,nr){
+  ctx.font='17px "Lilita One", Impact, sans-serif';
+  const bx = x - ctx.measureText(name).width/2 - 26, by = y - 2;
+  circ(ctx,bx,by,18); fs(ctx,'#ffd23a',3.5);
+  ctx.font='22px "Lilita One", Impact, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=INK; ctx.fillText(nr, bx, by+1.5);
+}
+function nameTag(x,y,name,col,ratio,label){
+  ctx.font='17px "Lilita One", Impact, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.lineWidth=5; ctx.strokeStyle='#000'; ctx.strokeText(name,x,y); ctx.fillStyle=col; ctx.fillText(name,x,y);
+  const bw=64, bh=11, bx=x-bw/2, by=y+5;
+  rr(ctx,bx,by,bw,bh,4); ctx.fillStyle='#1a1530'; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#000'; ctx.stroke();
+  if(ratio>0){ rr(ctx,bx+2,by+2,(bw-4)*ratio,bh-4,3); ctx.fillStyle = ratio>=1 ? '#4fd43e' : '#ffb21e'; ctx.fill(); }
+  if(label){ ctx.font='11px "Lilita One", Impact, sans-serif'; ctx.lineWidth=3; ctx.strokeText(label,x,by+bh-1.5); ctx.fillStyle='#fff'; ctx.fillText(label,x,by+bh-1.5); }
+}
+function ring(x,y,col,alpha){ ctx.save(); ctx.globalAlpha=alpha; ell(ctx,x,y,30,13); ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1; ctx.lineWidth=3; ctx.strokeStyle=col; ctx.stroke(); ctx.restore(); }
+function drawNPC(n){
+  const st = save.st[n.id], done = st && st.done;
+  const close = Math.hypot(player.x-n.x, player.y-n.y) < 170;
+  const face = (close || n.robot) ? (player.x < n.x ? -1 : 1) : (n.face || 1);
+  ring(n.x, n.y, n.teacher ? '#ff7eb6' : done ? '#4fd43e' : '#ffcf3a', .35);
+  ctx.save(); ctx.translate(n.x,n.y);
+  ctx.fillStyle='rgba(60,25,5,.3)'; ell(ctx,0,0,20,7); ctx.fill();
+  if(n.robot){ ctx.scale(1.25,1.25); drawRobot(ctx,time); }
+  else { if(n.teacher) ctx.scale(1.12,1.12); drawCharBody(ctx, n.look, time + (n.hx||n.x)*0.01, !!n.moving, face); }
+  ctx.restore();
+  const topY = n.robot ? n.y-150 : n.teacher ? n.y-122 : n.y-112;
+  if(n.teacher){ nameTag(n.x, topY, n.name, '#ffd0e6', 0, 'LEHRERIN'); bubble(n.x, topY-34+Math.sin(time*4+n.x)*3, '♥', '#ffffff', '#ff4f9a'); if(near===n){ ctx.save(); ctx.globalAlpha=.6+Math.sin(time*6)*.3; ell(ctx,n.x,n.y,38,17); ctx.lineWidth=4; ctx.strokeStyle='#fff'; ctx.stroke(); ctx.restore(); } return; }
+  if(n.robot) nameTag(n.x, topY, 'KAI', '#7fe6ff', doneCount()/STATIONS.length, 'PRÜFUNG');
+  else { nameTag(n.x, topY, n.name, '#ffffff', st ? st.stars/3 : 0, st ? '★'.repeat(st.stars)+'☆'.repeat(3-st.stars) : ''); numBadge(n.x, topY, n.name, n.nr); }
+  // Sprechblase
+  const by = topY - 34 + Math.sin(time*4 + n.x)*3;
+  if(n.robot){
+    if(allDone() && !save.license){ bubble(n.x, by, '!', '#ffcf3a'); }
+  } else if(lockedLast(n)){ bubble(n.x, by, '…', '#d6d9ea'); }
+  else if(n.id===LAST_ID && !done){ const pz = 1 + Math.max(0, Math.sin(time*6))*0.15; ctx.save(); ctx.translate(n.x, by); ctx.scale(pz,pz); bubble(0, 0, '!', '#e8323f', '#ffffff'); ctx.restore(); }
+  else if(!done){ bubble(n.x, by, '?', n.mg ? '#ffd23a' : '#ffffff', n.mg ? '#1d1233' : undefined); }
+  else { circ(ctx,n.x,by+6,12); fs(ctx,'#4fd43e',3); ctx.beginPath(); ctx.moveTo(n.x-6,by+6); ctx.lineTo(n.x-1,by+11); ctx.lineTo(n.x+7,by+1); ctx.lineWidth=3.5; ctx.strokeStyle='#fff'; ctx.stroke(); }
+  if(near===n){ ctx.save(); ctx.globalAlpha=.6+Math.sin(time*6)*.3; ell(ctx,n.x,n.y,38,17); ctx.lineWidth=4; ctx.strokeStyle='#fff'; ctx.stroke(); ctx.restore(); }
+}
+function bubble(x,y,ch2,col,tc){
+  rr(ctx,x-15,y-14,30,28,10); fs(ctx,col,3);
+  ctx.beginPath(); ctx.moveTo(x-5,y+13); ctx.lineTo(x,y+22); ctx.lineTo(x+5,y+13); ctx.closePath(); ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=INK; ctx.stroke();
+  ctx.fillStyle=col; ctx.fillRect(x-4,y+10,8,4);
+  ctx.font='22px "Lilita One", Impact, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle = tc || (col==='#ffffff' ? '#e8323f' : INK); ctx.fillText(ch2,x,y+1);
+}
+function drawPlayer(alpha){
+  const L = HEROES[save.char||0].look;
+  ctx.save(); ctx.globalAlpha = alpha;
+  ring(player.x, player.y, '#36a3ff', .35);
+  ctx.translate(player.x, player.y);
+  ctx.fillStyle='rgba(60,25,5,.3)'; ell(ctx,0,0,20,7); ctx.fill();
+  drawCharBody(ctx, L, time, player.moving, player.face);
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha = alpha;
+  nameTag(player.x, player.y-112, save.name||HEROES[save.char||0].name, '#7fd0ff', doneCount()/STATIONS.length, doneCount()+'/'+STATIONS.length);
+  ctx.restore();
+}
+function drawBarrier(){
+  const unlocked = allDone();
+  if(unlocked && barrierAnim<=0) return;
+  const x=GATE.x, y=PLAZA.y+PLAZA.h-16, w=GATE.w;
+  ctx.save(); ctx.globalAlpha = unlocked ? barrierAnim : 1;
+  const g = ctx.createLinearGradient(0,y-60,0,y+10);
+  g.addColorStop(0,'rgba(80,230,255,0)'); g.addColorStop(1,'rgba(80,230,255,.75)');
+  ctx.fillStyle=g; ctx.fillRect(x,y-60,w,72);
+  ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.lineWidth=2;
+  for(let i=0;i<4;i++){ const yy = y - ((time*40 + i*18) % 70) + 8; ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy); ctx.stroke(); }
+  ctx.fillStyle='#fff'; ctx.font='14px "Lilita One", Impact, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.lineWidth=3; ctx.strokeStyle='#13235e';
+  const txt = doneCount()+'/'+STATIONS.length; ctx.strokeText(txt,x+w/2,y-28); ctx.fillText(txt,x+w/2,y-28);
+  ctx.restore();
+}
+function drawGuide(){
+  let target = guideTarget;
+  if(!target){
+    if(allDone()) target = save.license ? null : KAI;
+    else { let bd=1e9; for(const s of STATIONS){ if((save.st[s.id] && save.st[s.id].done) || lockedLast(s)) continue; const d=Math.hypot(player.x-s.x,player.y-s.y); if(d<bd){bd=d;target=s;} } }
+  }
+  if(!target) return;
+  const dx = target.x-player.x, dy = target.y-player.y, d = Math.hypot(dx,dy);
+  if(d < 230) return;
+  const a = Math.atan2(dy,dx), R = 58;
+  ctx.save(); ctx.translate(player.x + Math.cos(a)*R, player.y-26 + Math.sin(a)*R*0.75); ctx.rotate(a);
+  ctx.globalAlpha = .85 + Math.sin(time*5)*.15;
+  ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(-8,-12); ctx.lineTo(-3,0); ctx.lineTo(-8,12); ctx.closePath();
+  fs(ctx, guideTarget ? '#ffcf3a' : '#ffffff', 3);
+  ctx.restore();
+}
+function render(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#3a2318'; ctx.fillRect(0,0,cw,ch);
+  ctx.save();
+  ctx.translate(cw/2, ch/2); ctx.scale(zoom,zoom); ctx.translate(-camera.x, -camera.y);
+  const vx0 = camera.x - cw/zoom/2 - 120, vx1 = camera.x + cw/zoom/2 + 120, vy0 = camera.y - ch/zoom/2 - 160, vy1 = camera.y + ch/zoom/2 + 160;
+  if(groundCanvas){
+    const sx = Math.max(0, vx0), sy = Math.max(0, vy0), sw = Math.min(W, vx1)-sx, sh = Math.min(H, vy1)-sy;
+    if(sw>0 && sh>0) ctx.drawImage(groundCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+  }
+  // Tiefensortierung
+  const list = [];
+  for(const o of obstacles){ if(o.hidden) continue; if(o.x+o.w < vx0 || o.x > vx1 || o.y+o.h < vy0 || o.y > vy1) continue; list.push({y:o.y+o.h, f:()=>drawObstacle(o)}); }
+  for(const b of bushes){ if(b.x+b.w < vx0 || b.x > vx1 || b.y+b.h < vy0 || b.y > vy1) continue; list.push({y:b.y+b.h-10, f:()=>ctx.drawImage(b.img.cv, b.img.ox, b.img.oy)}); }
+  for(const n of ALL_NPCS){ if(n.x < vx0 || n.x > vx1 || n.y < vy0 || n.y > vy1+60) continue; list.push({y:n.y, f:()=>drawNPC(n)}); }
+  list.push({y:player.y, f:()=>drawPlayer(1)});
+  list.push({y:PLAZA.y+PLAZA.h-1, f:drawBarrier});
+  list.sort((a,b)=>a.y-b.y);
+  for(const it of list) it.f();
+  const inBush = bushes.some(b=> player.x>b.x && player.x<b.x+b.w && player.y>b.y && player.y<b.y+b.h);
+  if(inBush) drawPlayer(.55);
+  drawGuide();
+  for(const p of particles){ ctx.globalAlpha=Math.min(1,p.life*2); circ(ctx,p.x,p.y,p.r); ctx.fillStyle=p.col; ctx.fill(); }
+  ctx.globalAlpha=1;
+  ctx.restore();
+  // Joystick
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const jx = joy.active ? joy.ox : 92 + (window.visualViewport ? 0 : 0), jy = joy.active ? joy.oy : ch - 104;
+  if(!paused){
+    ctx.globalAlpha = joy.active ? .9 : .55;
+    circ(ctx,jx,jy,56); ctx.fillStyle='rgba(20,30,80,.35)'; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.stroke();
+    circ(ctx,jx+joy.dx*56,jy+joy.dy*56,26); ctx.fillStyle='#2b6ad8'; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle=INK; ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  renderMinimap();
+}
+function drawObstacle(o){
+  switch(o.type){ case 'crate': case 'crateDark': drawCrate(ctx,o); break; case 'barrel': drawBarrel(ctx,o); break; case 'fenceH': case 'fenceV': drawFence(ctx,o); break; case 'cactus': drawCactus(ctx,o); break; case 'rock': drawRock(ctx,o); break; }
+}
+let mmBase = null;
+function renderMinimap(){
+  const w = mm.width, h = mm.height, sx = w/W, sy = h/H;
+  if(!mmBase && groundCanvas){ mmBase = document.createElement('canvas'); mmBase.width=w; mmBase.height=h; const g=mmBase.getContext('2d'); g.drawImage(groundCanvas,0,0,w,h); g.fillStyle='rgba(60,25,5,.55)'; for(const o of obstacles){ if(o.type==='pond') continue; g.fillRect(o.x*sx,o.y*sy,Math.max(2,o.w*sx),Math.max(2,o.h*sy)); } g.fillStyle='rgba(255,170,30,.6)'; for(const b of bushes) g.fillRect(b.x*sx,b.y*sy,b.w*sx,b.h*sy); }
+  if(mmBase) mctx.drawImage(mmBase,0,0); else { mctx.fillStyle='#e8a76a'; mctx.fillRect(0,0,w,h); }
+  for(const s of STATIONS){ const d = save.st[s.id] && save.st[s.id].done; circ(mctx,s.x*sx,s.y*sy,7); mctx.fillStyle = d ? '#4fd43e' : lockedLast(s) ? '#a8adc4' : '#ffcf3a'; mctx.fill(); mctx.lineWidth=2.5; mctx.strokeStyle=INK; mctx.stroke(); }
+  for(const t of TEACHERS){ circ(mctx,t.x*sx,t.y*sy,5); mctx.fillStyle='#ff7eb6'; mctx.fill(); mctx.lineWidth=2; mctx.strokeStyle=INK; mctx.stroke(); }
+  circ(mctx,KAI.x*sx,KAI.y*sy,8); mctx.fillStyle = allDone() ? '#50e6ff' : '#8892b8'; mctx.fill(); mctx.lineWidth=2.5; mctx.strokeStyle=INK; mctx.stroke();
+  const vw = cw/zoom, vh = ch/zoom; mctx.lineWidth=2; mctx.strokeStyle='rgba(255,255,255,.8)'; mctx.strokeRect((camera.x-vw/2)*sx,(camera.y-vh/2)*sy,vw*sx,vh*sy);
+  circ(mctx,player.x*sx,player.y*sy,8); mctx.fillStyle='#36a3ff'; mctx.fill(); mctx.lineWidth=3; mctx.strokeStyle='#fff'; mctx.stroke();
+}
+function loop(now){
+  const dt = Math.min(0.05, (now - t0)/1000); t0 = now; time += dt;
+  if(!paused) update(dt); else { player.moving=false; }
+  render();
+  requestAnimationFrame(loop);
+}
+
+/* ===================== HUD ===================== */
+function updateHud(){
+  const d = doneCount();
+  document.getElementById('progFill').style.width = (d/STATIONS.length*100)+'%';
+  document.getElementById('progText').textContent = save.license ? 'BESTANDEN!' : d+' / '+STATIONS.length;
+  document.getElementById('starText').textContent = starCount()+'/'+STATIONS.length*3;
+}
+let toastT = 0;
+function toast(msg){ const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove('show'), 2800); }
+
+/* ===================== DIALOGE ===================== */
+const dlg = document.getElementById('dialog'), panel = document.getElementById('dlgPanel');
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function shuffle(a){ const b=a.slice(); for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; }
+function header(n){
+  const z = n.robot ? {name:'Prüfungsplatz', color:'#36a3ff'} : n.teacher ? {name:'Lehrerin', color:'#ff4f9a'} : ZONES[n.zone];
+  return `<div class="who"><canvas class="pt" data-id="${n.id}"></canvas><div class="meta">
+    <span class="tag" style="background:${z.color}">${n.robot ? 'PRÜFUNG' : n.teacher ? 'LEHRERIN · SICHERHEITS-TIPP' : 'NR. '+n.nr+' · '+esc(z.name).toUpperCase()}</span>
+    <h2>${esc(n.name)}</h2></div></div>`;
+}
+function paintAll(root){ root.querySelectorAll('canvas.pt').forEach(c=>{ const id=c.dataset.id; const who = id==='kai'?KAI : id==='me' ? {look:HEROES[save.char||0].look} : ALL_NPCS.find(s=>s.id===id); if(who) paintPortrait(c, who); }); }
+function show(html){ panel.innerHTML = html; dlg.hidden = false; paused = true; paintAll(panel); panel.scrollTop = 0; const f = panel.querySelector('[data-focus]') || panel.querySelector('button'); if(f) f.focus({preventScroll:true}); lockActions(3000); }
+let dlgLocked = false, dlgLockUntil = 0, lockToken = 0;
+// Jedes Fenster bleibt mindestens 3 Sekunden stehen, bevor man weiterklicken kann
+function lockActions(ms){
+  const btns = [...panel.querySelectorAll('.actions .btn:not([disabled])')];
+  if(!btns.length) return;
+  const token = ++lockToken;
+  btns.forEach(b=>{ b.disabled = true; b.classList.add('wait'); });
+  dlgLockUntil = Date.now() + ms;
+  setTimeout(()=>{
+    btns.forEach(b=>{ if(b.isConnected){ b.disabled = false; b.classList.remove('wait'); } });
+    if(token !== lockToken) return;
+    const f = panel.querySelector('.actions [data-focus]:not([disabled])') || panel.querySelector('.actions .btn:not([disabled])');
+    if(f && !dlg.hidden) f.focus({preventScroll:true});
+  }, ms);
+}
+function closeDialog(){ if(dlg.hidden || dlgLocked || Date.now() < dlgLockUntil) return; stopMG(); dlg.hidden = true; paused = false; for(const k in keys) keys[k]=false; updateHud(); }
+dlg.addEventListener('pointerdown', e=>{ if(e.target===dlg) closeDialog(); });
+
+function openTalk(n){
+  joy.active=false; joy.dx=joy.dy=0;
+  if(n.robot) return openKai();
+  if(n.teacher) return openTeacher(n);
+  if(lockedLast(n)){
+    const left = STATIONS.filter(s=>s.id!==LAST_ID && !(save.st[s.id] && save.st[s.id].done)).length;
+    show(`${header(n)}<div class="bubble">Ich überlege noch … Sprich bitte erst mit den anderen.</div>
+      <div style="font-weight:800;color:var(--muted);margin:-4px 0 10px">Noch ${left} ${left===1?'Person':'Personen'}, dann ist ${esc(n.name)} bereit.</div>
+      <div class="actions"><button class="btn" type="button" data-a="close" data-focus>Okay!</button></div>`);
+    return bind({close:closeDialog});
+  }
+  const st = save.st[n.id];
+  const extra = st && st.done ? `<div class="feedback good"><strong>Schon geholfen! ${'★'.repeat(st.stars)}${'☆'.repeat(3-st.stars)}</strong>${n.worksheet ? 'Du kannst dir das Arbeitsblatt nochmal ansehen.' : 'Du kannst '+(n.mg ? 'nochmal spielen' : 'das Quiz wiederholen')+' und mehr Sterne holen.'}</div>` : '';
+  show(`${header(n)}
+    <div class="bubble">${esc(n.ask)}</div>${extra}
+    <div class="actions">
+      <button class="btn ghost" type="button" data-a="close">Später</button>
+      <button class="btn blue" type="button" data-a="info" data-focus>Wissensbox öffnen</button>
+      ${st && st.done ? '<button class="btn" type="button" data-a="quiz">'+(n.worksheet?'Arbeitsblatt ansehen':n.mg?'Nochmal spielen':'Quiz wiederholen')+'</button>' : ''}
+    </div>`);
+  bind({close:closeDialog, info:()=>openInfo(n), quiz:()=> startTask(n)});
+}
+function openTeacher(n, i){
+  if(i === undefined){ i = n.tipI || 0; n.tipI = (i+1) % n.tips.length; }
+  show(`${header(n)}
+    <div class="bubble">${esc(n.hello)}<br><br><span style="color:#c21f86">„${esc(n.tips[i])}“</span></div>
+    <div style="font-weight:800;color:var(--muted);font-size:13px;margin:-6px 0 10px">Tipp ${i+1} von ${n.tips.length}</div>
+    <div class="actions">
+      <button class="btn blue" type="button" data-a="more">Noch ein Tipp</button>
+      <button class="btn" type="button" data-a="close" data-focus>Danke, ${esc(n.name)}!</button>
+    </div>`);
+  bind({more:()=>{ const j = n.tipI; n.tipI = (j+1) % n.tips.length; openTeacher(n, j); }, close:()=>{ closeDialog(); toast(n.bye); }});
+}
+function openInfo(n){
+  show(`${header(n)}
+    <div class="know"><h3 style="color:#c21f86;text-shadow:none">Das musst du wissen</h3>
+      <ul>${n.info.map(i=>'<li>'+i+'</li>').join('')}</ul>
+      ${n.no ? '<div class="no">'+esc(n.no)+'</div>' : ''}
+      ${n.example ? '<div class="example"><b>PRAXIS-BEISPIEL</b><br>'+esc(n.example)+(n.task ? '<div style="margin-top:10px;padding-top:8px;border-top:2px dashed #d63aa0"><b>DEINE AUFGABE</b><br>'+esc(n.task)+'</div>' : '')+'</div>' : ''}
+      ${n.link ? '<p style="margin:10px 0 0;font-weight:800"><a href="'+n.link.href+'" target="_blank" rel="noopener">'+esc(n.link.text)+' ↗</a></p>' : ''}
+    </div>
+    <div class="actions">
+      <button class="btn ghost" type="button" data-a="back">Zurück</button>
+      <button class="btn small" type="button" data-a="gl" style="background:var(--green);color:#fff;box-shadow:inset 0 -4px 0 var(--green-d),0 3px 0 var(--ink)">Wortspeicher</button>
+      <button class="btn" type="button" data-a="quiz" data-focus>${n.worksheet ? 'Zum Arbeitsblatt' : n.mg ? 'Minigame starten: '+esc(n.mg.title) : esc(n.name)+' helfen: Quiz starten'}</button>
+    </div>`);
+  bind({back:()=>openTalk(n), gl:()=>openGlossary(), quiz:()=> startTask(n)});
+}
+function bind(map){ panel.querySelectorAll('[data-a]').forEach(b=> b.addEventListener('click', ()=>{ const f = map[b.dataset.a]; if(f) f(); })); }
+
+let Q = null;
+function startQuiz(n){ Q = {n, qs: n.quiz.map(q=>({q:q.q, e:q.e, right:q.a[0], opts:shuffle(q.a)})), i:0, res:[], exam:false}; askQ(); }
+function startExam(){ Q = {n:KAI, qs: shuffle(STATIONS).map(s=>({q:s.exam.q, e:s.exam.e, right:s.exam.a[0], opts:shuffle(s.exam.a), topic:s.topic})), i:0, res:[], exam:true}; askQ(); }
+function askQ(){
+  const q = Q.qs[Q.i], total = Q.qs.length;
+  const dots = Q.qs.map((_,k)=>`<i class="${k<Q.i ? (Q.res[k]?'ok':'no') : (k===Q.i?'cur':'')}"></i>`).join('');
+  show(`${header(Q.n)}
+    <div class="qhead"><h3 style="margin:0">${Q.exam ? 'Prüfungsfrage' : 'Frage'} ${Q.i+1} von ${total}</h3><div class="dots">${dots}</div></div>
+    ${q.topic ? '<div style="font-weight:800;color:var(--muted);font-size:13px">Thema: '+esc(q.topic)+'</div>' : ''}
+    <div class="question">${esc(q.q)}</div>
+    <div class="opts">${q.opts.map((o,k)=>`<button class="opt" type="button" data-k="${k}"><span class="l">${'ABCD'[k]}</span><span>${esc(o)}</span></button>`).join('')}</div>
+    <div id="fb"></div>`);
+  panel.querySelectorAll('.opt').forEach(b=> b.addEventListener('click', ()=> answer(+b.dataset.k)));
+}
+function answer(k){
+  const q = Q.qs[Q.i], ok = q.opts[k] === q.right;
+  Q.res[Q.i] = ok;
+  panel.querySelectorAll('.opt').forEach((b,j)=>{ b.disabled = true; if(q.opts[j]===q.right) b.classList.add('right'); else if(j===k) b.classList.add('wrong'); });
+  const last = Q.i === Q.qs.length-1;
+  const praise = ['Richtig!','Stark!','Genau so!','Treffer!'], nope = ['Knapp daneben.','Nicht ganz.','Leider falsch.'];
+  document.getElementById('fb').innerHTML = `<div class="feedback ${ok?'good':'bad'}"><strong>${ok ? praise[Math.floor(Math.random()*praise.length)] : nope[Math.floor(Math.random()*nope.length)]}</strong>${esc(q.e)}</div>
+    <div class="actions" style="margin-top:12px"><button class="btn" type="button" id="nextQ">${last ? 'Auswertung' : 'Weiter'}</button></div>`;
+  const nb = document.getElementById('nextQ'); nb.focus({preventScroll:true});
+  nb.scrollIntoView({block:'nearest'});
+  nb.addEventListener('click', ()=>{ if(last) (Q.exam ? examResult() : quizResult()); else { Q.i++; askQ(); } });
+}
+const STAR = on => `<svg viewBox="0 0 24 24" class="${on?'on':''}"><path d="M12 1.8l3 6.5 7.1.8-5.3 4.8 1.5 7-6.3-3.6-6.3 3.6 1.5-7L1.9 9.1 9 8.3z" fill="${on?'#ffd23a':'#4a5490'}" stroke="#1d1233" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+function quizResult(){ finishStation(Q.n, Q.res.filter(Boolean).length, null); }
+function finishStation(n, right, info){
+  stopMG(); const pass = right >= 2;
+  const prev = save.st[n.id] || {stars:0, done:false};
+  const wasDone = prev.done;
+  if(pass){ save.st[n.id] = {stars: Math.max(prev.stars, right), done:true}; persist(); }
+  show(`${header(n)}
+    <div class="result">
+      <h2>${pass ? (right===3 ? 'Perfekt!' : 'Geschafft!') : 'Fast geschafft!'}</h2>
+      <div class="stars">${[0,1,2].map(i=>STAR(i<right)).join('')}</div>
+      <p>${pass ? '<span style="color:#fff">„'+esc(n.thanks)+'“</span>' : (info ? esc(info) : right+' von 3 richtig.')+' Du brauchst mindestens 2 Sterne. Lies nochmal in der Wissensbox nach und versuch es erneut!'}</p>
+      ${pass && info ? '<p style="color:var(--muted);font-size:15px">'+esc(info)+'</p>' : ''}
+      ${pass && doneCount()===STATIONS.length && !wasDone ? '<p style="color:var(--yellow)">Du hast allen '+STATIONS.length+' Personen geholfen! Das Tor zu KAI ist jetzt offen.</p>' : ''}
+    </div>
+    <div class="actions" style="justify-content:center">
+      ${pass ? '' : '<button class="btn blue" type="button" data-a="info">Wissensbox</button>'}
+      <button class="btn ${pass?'ghost':''}" type="button" data-a="again">Nochmal</button>
+      ${pass ? '<button class="btn" type="button" data-a="close" data-focus>Zurück in die Arena</button>' : ''}
+    </div>`);
+  bind({info:()=>openInfo(n), again:()=> startTask(n), close:()=>{ closeDialog(); if(pass && !wasDone){ burst(n.x,n.y-60,ZONES[n.zone].color,34); toast(n.name+' sagt danke! '+doneCount()+' von '+STATIONS.length+' geschafft.'); setTimeout(maybeKikiHint, 900); } }});
+  updateHud();
+}
+function showDuo(text, btn, onGo){
+  show(`<div class="duo">${TEACHERS.map(t=>`<div><canvas class="pt" data-id="${t.id}"></canvas>${esc(t.name)}</div>`).join('')}</div>
+    <div style="text-align:center"><span class="tag" style="background:#ff4f9a">DEINE LEHRERINNEN</span></div>
+    <div class="bubble">${text}</div>
+    <div class="actions" style="justify-content:center"><button class="btn" type="button" data-a="go" data-focus>${esc(btn)}</button></div>`);
+  bind({go:()=>{ closeDialog(); if(onGo) onGo(); }});
+}
+function maybeKikiHint(){
+  const k = STATIONS.find(s=>s.id===LAST_ID);
+  if(!k || save.kikiHint || (save.st[k.id] && save.st[k.id].done) || lockedLast(k) || !dlg.hidden) return;
+  save.kikiHint = true; persist(); guideTarget = k;
+  showDuo('Oh, Kiki hat noch eine Frage …<br><br>Du hast allen anderen schon geholfen, toll! Schau doch mal bei Kiki vorbei.', 'Ich gehe zu Kiki!', ()=> toast('Folge dem gelben Pfeil zu Kiki!'));
+  updateHud();
+}
+
+/* ===================== MINIGAMES ===================== */
+let MG = null;
+const $ = sel => panel.querySelector(sel);
+function stopMG(){ if(MG && MG.stop) MG.stop(); MG = null; }
+function starsFrom(v, t3, t2, t1){ return v>=t3 ? 3 : v>=t2 ? 2 : v>=t1 ? 1 : 0; }
+// Link zum Arbeitsblatt (optional): hier eine Adresse eintragen, dann erscheint bei Kiki ein Knopf zum Öffnen
+const WORKSHEET_URL = '';
+function startTask(n){ if(n.worksheet) openWorksheet(n); else if(n.mg) startMG(n); else startQuiz(n); }
+function openWorksheet(n){
+  stopMG();
+  show(`${header(n)}
+    <span class="mg-badge" style="background:#ff7eb6">ARBEITSBLATT</span>
+    <div class="bubble" style="margin-top:12px">Jetzt wird es praktisch! Nimm dein <b>Arbeitsblatt</b> zur Hand, das du schon bekommen hast, und bearbeite es in Ruhe.</div>
+    <div class="know"><h3 style="color:#c21f86;text-shadow:none">So geht’s</h3><ul>
+      <li>Nimm dein Arbeitsblatt zur Hand.</li>
+      <li>Frage deine Lehrkraft nach dem KI-Zugang.</li>
+      <li>Nutze die Tipps aus meiner Wissensbox und den Wortspeicher.</li>
+      <li>Wenn du fertig bist, komm zurück und sag mir Bescheid.</li></ul>
+      ${WORKSHEET_URL ? '<p style="margin:12px 0 0"><a class="btn blue" style="display:inline-block;text-decoration:none" href="'+esc(WORKSHEET_URL)+'" target="_blank" rel="noopener">Arbeitsblatt öffnen ↗</a></p>' : ''}
+    </div>
+    <div class="actions">
+      <button class="btn ghost" type="button" data-a="later">Später</button>
+      <button class="btn" type="button" data-a="done" data-focus>Ich habe das Arbeitsblatt bearbeitet</button>
+    </div>`);
+  bind({later:closeDialog, done:()=>finishStation(n, 3, 'Arbeitsblatt bearbeitet.')});
+}
+function startMG(n){
+  stopMG();
+  show(`${header(n)}
+    <span class="mg-badge">MINIGAME</span>
+    <h2 style="margin:6px 0 8px">${esc(n.mg.title)}</h2>
+    <div class="bubble">${n.mg.intro}</div>
+    <div class="actions"><button class="btn ghost" type="button" data-a="back">Zurück</button><button class="btn" type="button" data-a="go" data-focus>Los geht’s!</button></div>`);
+  bind({back:()=>openInfo(n), go:()=>MINIGAMES[n.mg.type](n)});
+}
+
+/* 1) Paul: Daten-Sortierer */
+const SORT_ITEMS = [
+  ['„Erkläre mir den Satz des Pythagoras.“', true, 'Eine Sachfrage ohne persönliche Daten ist kein Problem.'],
+  ['„Ich wohne im Lindenweg 12 in Bremen.“', false, 'Deine Adresse bleibt immer bei dir.'],
+  ['Ein Foto von deinem Freund Tom', false, 'Fotos von anderen Personen gehören nicht in die KI.'],
+  ['„Gib mir Ideen für ein Referat über Haie.“', true, 'Ideen sammeln ist völlig okay.'],
+  ['„Mein Passwort ist Sonne123.“', false, 'Passwörter verrätst du niemandem, auch keiner KI.'],
+  ['„Schreib eine Geschichte über einen Drachen.“', true, 'Eine erfundene Geschichte ist unbedenklich.'],
+  ['Die Telefonnummer deiner Verwandtschaft', false, 'Telefonnummern sind persönliche Daten, auch die von anderen.'],
+  ['„Schreib eine Einladung für [Name] zum Geburtstag.“', true, 'Mit Platzhalter statt echtem Namen: genau richtig!'],
+  ['Dein voller Name und dein Geburtsdatum', false, 'Name plus Geburtsdatum machen dich erkennbar.'],
+  ['„Übersetze ‚Guten Morgen‘ ins Englische.“', true, 'Eine Übersetzung ist unbedenklich.'],
+  ['Ein Klassenfoto mit allen Namen', false, 'Fotos und Namen deiner Mitschüler*innen bleiben privat.'],
+  ['„Wie funktioniert ein Vulkan?“', true, 'Eine Wissensfrage ist kein Problem.']
+];
+function mgSort(n){
+  const items = shuffle(n.mg.items || SORT_ITEMS).slice(0,10), TIME = 7;
+  let i = 0, score = 0, t = 0, raf = 0, locked = true, last = performance.now();
+  const me = {}; MG = me;
+  show(`${header(n)}
+    <div class="mg-top"><b id="mgCount"></b><b>Richtig: <span id="mgScore">0</span></b></div>
+    <div class="timer"><i id="mgTimer"></i></div>
+    <div class="card-big" id="mgCard"></div>
+    <div class="sort-btns">
+      <button class="btn sort-ok" type="button" id="mgYes">${esc(n.mg.yes || '✓ Darf in die KI')}</button>
+      <button class="btn red" type="button" id="mgNo">${esc(n.mg.no || '✕ Bleibt bei mir')}</button>
+    </div>
+    <div class="mg-hint">Am PC geht es auch mit den Pfeiltasten: ← linker Knopf, → rechter Knopf</div>
+    <div id="mgfb" class="mgfb"></div>`);
+  const card = $('#mgCard'), timer = $('#mgTimer'), fb = $('#mgfb');
+  const showItem = ()=>{ $('#mgCount').textContent = 'Karte '+(i+1)+' / '+items.length; card.textContent = items[i][0]; card.className = 'card-big in'; fb.innerHTML = ''; fb.className = 'mgfb'; t = 0; locked = false; };
+  const done = ()=> finishStation(n, starsFrom(score,9,7,5), score+' von '+items.length+' Karten richtig sortiert.');
+  const pick = (yes)=>{
+    if(locked || MG !== me) return; locked = true;
+    const it = items[i], ok = yes === it[1];
+    if(ok) score++;
+    $('#mgScore').textContent = score;
+    card.className = 'card-big '+(ok ? 'good' : 'bad');
+    fb.className = 'mgfb '+(ok ? 'good' : 'bad');
+    fb.innerHTML = '<b>'+(yes===null ? 'Zu langsam! ' : ok ? 'Richtig! ' : 'Achtung! ')+'</b>'+esc(it[2]);
+    setTimeout(()=>{ if(MG !== me) return; i++; if(i >= items.length) done(); else showItem(); }, 1600);
+  };
+  const tick = (now)=>{ const dt = Math.min(.1,(now-last)/1000); last = now; if(!locked){ t += dt; timer.style.width = Math.max(0,100-t/TIME*100)+'%'; if(t >= TIME) pick(null); } raf = requestAnimationFrame(tick); };
+  $('#mgYes').onclick = ()=>pick(true); $('#mgNo').onclick = ()=>pick(false);
+  me.stop = ()=>cancelAnimationFrame(raf);
+  me.key = k=>{ if(k==='arrowleft') pick(true); if(k==='arrowright') pick(false); };
+  showItem(); raf = requestAnimationFrame(tick);
+}
+
+/* 2) Lina: Prompt-Baukasten */
+const PROMPT_ROUNDS = [
+  {goal:'Ein Rezept für Pfannkuchen, das Kinder nachkochen können.',
+   good:['Schreibe ein Rezept','für Pfannkuchen','für Kinder ab 10 Jahren','mit Zutatenliste und Schritt-für-Schritt-Anleitung'],
+   bad:['Mach mal was mit Essen','Ich heiße Lea Schmidt','egal wie','irgendwie lecker'],
+   answer:'Klar! Hier ist ein Pfannkuchen-Rezept für Kinder. Zutaten: 200 g Mehl, 2 Eier, 300 ml Milch … Schritt 1: …'},
+  {goal:'Ein Sachtext über Haie für ein Referat in Klasse 7.',
+   good:['Schreibe einen Sachtext','über Haie','für die 7. Klasse','mit ca. 150 Wörtern'],
+   bad:['Haie!!!','irgendwas Cooles','meine Adresse ist Hauptstraße 5','so lang wie möglich'],
+   answer:'Gern! „Haie leben in allen Meeren der Welt …“ Ein Sachtext mit ca. 150 Wörtern, einfach erklärt.'},
+  {goal:'Ein Comic-Bild für das Plakat zum Sommerfest.',
+   good:['Erstelle ein Bild','im Comic-Stil','von Kindern beim Sommerfest','mit Luftballons und bunten Farben'],
+   bad:['Bild.','mit einem Foto meiner Klasse','mach’s halt schön','egal welcher Stil'],
+   answer:'Hier ist dein buntes Comic-Bild: Kinder feiern das Sommerfest mit vielen Luftballons!'}
+];
+function mgPrompt(n){
+  let r = 0, wins = 0; MG = {};
+  const round = ()=>{
+    const R = PROMPT_ROUNDS[r];
+    const chips = shuffle([...R.good.map(t=>({t,g:true})), ...R.bad.map(t=>({t,g:false}))]);
+    const sel = [];
+    show(`${header(n)}
+      <div class="mg-top"><b>Auftrag ${r+1} / ${PROMPT_ROUNDS.length}</b><b>Gute Prompts: ${wins}</b></div>
+      <div class="goal"><span>DEIN ZIEL</span>${esc(R.goal)}</div>
+      <div class="prompt-line" id="pl"></div>
+      <div class="chip-pool">${chips.map((c,k)=>`<button class="pchip" type="button" data-k="${k}">${esc(c.t)}</button>`).join('')}</div>
+      <div id="mgfb"></div>
+      <div class="actions"><button class="btn" type="button" id="send" data-focus>Prompt abschicken</button></div>`);
+    const pl = $('#pl');
+    const draw = ()=>{ pl.innerHTML = sel.length ? sel.map(k=>esc(chips[k].t)).join(' ')+'<span class="caret"></span>' : '<span class="ph">Tippe unten die passenden Bausteine an …</span>'; };
+    draw();
+    panel.querySelectorAll('.pchip').forEach(b=> b.onclick = ()=>{ const k = +b.dataset.k, at = sel.indexOf(k); if(at>=0) sel.splice(at,1); else sel.push(k); b.classList.toggle('on', at<0); draw(); });
+    $('#send').onclick = ()=>{
+      if(!sel.length){ toast('Wähle zuerst ein paar Bausteine aus!'); return; }
+      const good = sel.filter(k=>chips[k].g).length, bad = sel.filter(k=>!chips[k].g);
+      const win = bad.length===0 && good>=3; if(win) wins++;
+      panel.querySelectorAll('.pchip').forEach(b=>{ b.disabled = true; const k = +b.dataset.k; if(chips[k].g) b.classList.add('isgood'); else if(sel.includes(k)) b.classList.add('isbad'); });
+      let msg;
+      if(win) msg = good===R.good.length ? 'Alles drin, was die KI braucht!' : 'Sehr gut! Mit dem grünen Baustein, der noch fehlt, wäre er perfekt.';
+      else msg = (bad.length ? 'Diese Bausteine passen nicht: '+bad.map(k=>'„'+chips[k].t+'“').join(', ')+'. ' : '') + (good<3 ? 'Es fehlen noch wichtige Angaben (grün markiert).' : '');
+      if(bad.some(k=>/heiße|Adresse|Foto/.test(chips[k].t))) msg += ' Denk dran: Keine persönlichen Daten in die KI!';
+      $('#mgfb').innerHTML = `<div class="ki-reply"><span>KI</span>${esc(win ? R.answer : 'Ähm … ich bin nicht sicher, was du genau möchtest. Kannst du das genauer beschreiben?')}</div>
+        <div class="feedback ${win?'good':'bad'}"><strong>${win?'Treffer!':'Noch nicht ganz.'}</strong>${esc(msg)}</div>`;
+      const lastR = r === PROMPT_ROUNDS.length-1, btn = $('#send');
+      btn.textContent = lastR ? 'Auswertung' : 'Nächster Auftrag';
+      btn.onclick = ()=>{ if(lastR) finishStation(n, wins, wins+' von 3 Prompts waren richtig gut.'); else { r++; round(); } };
+      btn.focus({preventScroll:true}); btn.scrollIntoView({block:'nearest'});
+    };
+  };
+  round();
+}
+
+/* 3) Dr. Nova: Fakten-Check */
+const FACT_TEXTS = [
+  'Der Eiffelturm steht in [Rom|Paris] und wurde 1889 fertiggestellt. Deutschland hat [12|16] Bundesländer. Die Hauptstadt von Spanien ist [Barcelona|Madrid]. Ein Jahr hat 365 oder 366 Tage.',
+  'Wale sind [Fische|Säugetiere] und atmen mit einer Lunge. Spinnen haben [sechs|acht] Beine. Wasser kocht auf Meereshöhe bei 100 Grad Celsius. Der Mond leuchtet, weil er [selbst brennt|das Licht der Sonne zurückwirft].'
+];
+function mgFacts(n){
+  let ti = 0, found = 0, wrong = 0; MG = {};
+  const total = FACT_TEXTS.reduce((a,t)=>a+(t.match(/\[/g)||[]).length, 0);
+  const round = ()=>{
+    let html = '', errs = 0, hit = 0, over = false;
+    FACT_TEXTS[ti].split(/(\[[^\]]+\])/).forEach(part=>{
+      if(!part) return;
+      if(part[0]==='['){ const [w,fix] = part.slice(1,-1).split('|'); errs++; html += `<button class="w" type="button" data-fix="${esc(fix)}">${esc(w)}</button>`; }
+      else part.split(/(\s+)/).forEach(tok=>{ if(!tok) return; if(/^\s+$/.test(tok)) html += ' '; else if(/[A-Za-zÄÖÜäöüß0-9]/.test(tok)) html += `<button class="w" type="button">${esc(tok)}</button>`; else html += esc(tok); });
+    });
+    show(`${header(n)}
+      <div class="mg-top"><b>KI-Antwort ${ti+1} / ${FACT_TEXTS.length}</b><b>Gefunden: <span id="fc">0</span>/${errs} · Fehlklicks: <span id="wc">${wrong}</span></b></div>
+      <div class="ki-chat"><div class="ki-av">KI</div><div class="ki-txt" id="kt">${html}</div></div>
+      <div class="mg-hint">Tippe auf die Wörter, die falsch sind!</div>
+      <div id="mgfb"></div>
+      <div class="actions"><button class="btn ghost" type="button" id="giveup">Ich finde keine mehr</button></div>`);
+    const end = ()=>{
+      if(over) return; over = true;
+      panel.querySelectorAll('#kt .w').forEach(w=>{ if(w.dataset.fix!==undefined && !w.classList.contains('hit')){ w.classList.add('miss'); w.insertAdjacentHTML('afterend',' <em class="fix">→ '+esc(w.dataset.fix)+'</em>'); } w.disabled = true; });
+      const lastT = ti === FACT_TEXTS.length-1;
+      $('#mgfb').innerHTML = `<div class="feedback ${hit===errs?'good':'bad'}" style="margin-top:12px"><strong>${hit===errs?'Alle Fehler entlarvt!':'Ein paar Fehler sind dir entwischt (gelb).'}</strong>Die KI klang total sicher, und trotzdem waren ${errs} Fakten falsch. Deshalb: Quellen prüfen!</div>`;
+      const b = $('#giveup'); b.className = 'btn'; b.textContent = lastT ? 'Auswertung' : 'Nächste KI-Antwort';
+      b.onclick = ()=>{ if(lastT){ const pts = found - wrong; finishStation(n, starsFrom(pts, total, total-2, total-4), found+' von '+total+' Fehlern gefunden, '+wrong+' Fehlklick'+(wrong===1?'':'s')+'.'); } else { ti++; round(); } };
+      b.focus({preventScroll:true}); b.scrollIntoView({block:'nearest'});
+    };
+    panel.querySelectorAll('#kt .w').forEach(w=> w.onclick = ()=>{
+      if(over || w.classList.contains('hit') || w.classList.contains('nope')) return;
+      if(w.dataset.fix!==undefined){ w.classList.add('hit'); w.insertAdjacentHTML('afterend',' <em class="fix">→ '+esc(w.dataset.fix)+'</em>'); hit++; found++; $('#fc').textContent = hit; if(hit===errs) end(); }
+      else { w.classList.add('nope'); wrong++; $('#wc').textContent = wrong; }
+    });
+    $('#giveup').onclick = end;
+  };
+  round();
+}
+
+/* 4) Jules: Fake-Detektiv */
+const SPOT_ERRS = [
+  {k:'hand',   x:340, y:206, r:36, t:'Sechs Finger! Bei Händen und Fingern macht KI oft Fehler.'},
+  {k:'banner', rect:[146,58,228,64], t:'Verdrehte Buchstaben auf dem Banner! KI-Bilder haben oft falsche oder unlesbare Schrift.'},
+  {k:'clock',  x:530, y:136, r:38, t:'Eine 13 auf der Uhr! KI mischt Details oft unlogisch zusammen.'},
+  {k:'shadow', rect:[0,246,108,34], t:'Der Baumschatten zeigt zur Sonne hin! Alle Schatten müssten von der Sonne weg zeigen.'},
+  {k:'dog',    rect:[436,282,118,82], t:'Der Hund hat fünf Beine! Zu viele oder zu wenige Körperteile sind typische KI-Fehler.'}
+];
+function drawScene(g){
+  const sky = g.createLinearGradient(0,0,0,250); sky.addColorStop(0,'#7fd0ff'); sky.addColorStop(1,'#d9f4ff');
+  g.fillStyle = sky; g.fillRect(0,0,640,250);
+  g.fillStyle = '#9fd46a'; g.fillRect(0,236,640,22);
+  g.fillStyle = '#d2c7b4'; g.fillRect(0,254,640,146);
+  g.strokeStyle = 'rgba(120,100,80,.25)'; g.lineWidth = 2;
+  for(let x=20; x<700; x+=46){ g.beginPath(); g.moveTo(x,256); g.lineTo(x-40,400); g.stroke(); }
+  // Sonne
+  g.fillStyle = '#ffd23a';
+  for(let i=0;i<12;i++){ const a = i*Math.PI/6; g.beginPath(); g.moveTo(58+Math.cos(a)*32,52+Math.sin(a)*32); g.lineTo(58+Math.cos(a+.16)*46,52+Math.sin(a+.16)*46); g.lineTo(58+Math.cos(a-.16)*46,52+Math.sin(a-.16)*46); g.fill(); }
+  circ(g,58,52,27); fs(g,'#ffd23a',3);
+  // Schulgebäude
+  rr(g,430,96,200,160,6); fs(g,'#e8945a',3);
+  g.beginPath(); g.moveTo(420,102); g.lineTo(530,54); g.lineTo(640,102); g.closePath(); fs(g,'#b4553a',3);
+  for(const [wx,wy] of [[446,182],[590,182],[446,220],[590,220]]){ rr(g,wx,wy,32,26,3); fs(g,'#7fd0ff',2.5); }
+  rr(g,512,200,38,56,4); fs(g,'#7a3f18',3);
+  // Uhr mit 13
+  circ(g,530,136,30); fs(g,'#fff',3);
+  g.fillStyle = INK; g.font = 'bold 14px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('13',530,117); g.fillText('3',550,136); g.fillText('6',530,156); g.fillText('9',510,136);
+  g.beginPath(); g.moveTo(530,136); g.lineTo(530,122); g.moveTo(530,136); g.lineTo(542,141); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
+  // Banner
+  rr(g,146,60,8,196,3); fs(g,'#8a5a3a',2.5); rr(g,366,60,8,196,3); fs(g,'#8a5a3a',2.5);
+  rr(g,150,66,220,50,6); fs(g,'#fff',3);
+  g.fillStyle = '#e8323f'; g.font = '21px "Lilita One", Impact, sans-serif'; g.fillText('SCHLUE-SOMMERFSET',260,92,200);
+  // Baum mit falschem Schatten (zur Sonne)
+  ell(g,50,262,56,10); g.fillStyle = 'rgba(40,40,60,.38)'; g.fill();
+  rr(g,100,165,22,92,5); fs(g,'#8a5a3a',3);
+  circ(g,84,150,34); fs(g,'#3caa4a',3); circ(g,140,150,34); fs(g,'#3caa4a',3); circ(g,112,120,40); fs(g,'#4cc95a',3);
+  // Mädchen (Schatten korrekt nach rechts)
+  ell(g,328,357,42,8); g.fillStyle = 'rgba(40,40,60,.38)'; g.fill();
+  const skin = '#f1c08f';
+  rr(g,279,318,10,38,4); fs(g,skin,2.5); rr(g,293,318,10,38,4); fs(g,skin,2.5);
+  rr(g,275,350,16,8,3); fs(g,'#e8323f',2.5); rr(g,291,350,16,8,3); fs(g,'#e8323f',2.5);
+  rr(g,265,272,9,36,4); fs(g,skin,2.5);
+  g.lineCap = 'round';
+  g.beginPath(); g.moveTo(304,278); g.lineTo(336,222); g.lineWidth = 13; g.strokeStyle = INK; g.stroke(); g.lineWidth = 8; g.strokeStyle = skin; g.stroke();
+  for(let f=0; f<6; f++){ const a = -Math.PI*0.95 + f*(Math.PI*0.9/5); const ex = 340+Math.cos(a)*22, ey = 210+Math.sin(a)*22;
+    g.beginPath(); g.moveTo(340,210); g.lineTo(ex,ey); g.lineWidth = 7.5; g.strokeStyle = INK; g.stroke(); g.lineWidth = 4; g.strokeStyle = skin; g.stroke(); }
+  circ(g,340,212,10); fs(g,skin,2.5);
+  g.beginPath(); g.moveTo(272,324); g.lineTo(312,324); g.lineTo(303,268); g.lineTo(281,268); g.closePath(); fs(g,'#ff5a8a',3);
+  circ(g,292,248,22); fs(g,skin,3);
+  g.beginPath(); g.arc(292,244,23,Math.PI*1.02,Math.PI*1.98); g.closePath(); fs(g,'#6b3d1f',3);
+  ell(g,268,258,6,16); fs(g,'#6b3d1f',2.5);
+  g.fillStyle = INK; circ(g,285,250,2.6); g.fill(); circ(g,299,250,2.6); g.fill();
+  g.beginPath(); g.arc(292,256,6,0.15*Math.PI,0.85*Math.PI); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke();
+  // Hund mit fünf Beinen
+  ell(g,500,365,46,7); g.fillStyle = 'rgba(40,40,60,.38)'; g.fill();
+  g.beginPath(); g.moveTo(444,318); g.lineTo(426,300); g.lineWidth = 7; g.strokeStyle = INK; g.stroke(); g.lineWidth = 3.5; g.strokeStyle = '#e0a565'; g.stroke();
+  for(const lx of [450,465,482,498,513]){ rr(g,lx,328,8,32,3); fs(g,'#c98a4b',2.5); }
+  ell(g,482,324,42,18); fs(g,'#e0a565',3);
+  circ(g,530,306,17); fs(g,'#e0a565',3);
+  ell(g,522,296,6,11); fs(g,'#a8652f',2.5);
+  g.fillStyle = INK; circ(g,535,303,2.6); g.fill(); circ(g,546,309,3.5); g.fill();
+  g.lineCap = 'butt';
+}
+function mgSpot(n){
+  const TIME = 60;
+  let left = TIME, raf = 0, last = performance.now(), over = false;
+  const found = new Set(), marks = [];
+  const me = {}; MG = me;
+  show(`${header(n)}
+    <div class="mg-top"><b>Finde die 5 KI-Fehler!</b><b>Gefunden: <span id="sf">0</span>/5</b></div>
+    <div class="timer"><i id="mgTimer"></i></div>
+    <canvas class="scene" id="scene" aria-label="Mit KI erzeugtes Bild eines Schulfests mit versteckten Fehlern"></canvas>
+    <ul class="found-list" id="fl"></ul>
+    <div class="actions"><button class="btn ghost" type="button" id="stopBtn">Fertig</button></div>`);
+  const sc = $('#scene'), g = sc.getContext('2d'), timer = $('#mgTimer'), fl = $('#fl');
+  let cssW = 0;
+  const fit = ()=>{ const w = sc.clientWidth || 600; if(w === cssW) return; cssW = w; const d = Math.min(2, window.devicePixelRatio||1); sc.width = Math.round(w*d); sc.height = Math.round(w*400/640*d); };
+  const hitTest = (h,x,y)=> h.r ? Math.hypot(x-h.x,y-h.y) < h.r : (x>h.rect[0] && x<h.rect[0]+h.rect[2] && y>h.rect[1] && y<h.rect[1]+h.rect[3]);
+  const outline = (h,col,dash)=>{ g.save(); g.lineWidth = 5; g.strokeStyle = col; if(dash) g.setLineDash([10,7]); if(h.r){ circ(g,h.x,h.y,h.r); g.stroke(); } else { rr(g,h.rect[0],h.rect[1],h.rect[2],h.rect[3],12); g.stroke(); } g.restore(); };
+  const draw = ()=>{
+    fit(); const s = sc.width/640; g.setTransform(s,0,0,s,0,0); g.clearRect(0,0,640,400);
+    drawScene(g);
+    for(const h of SPOT_ERRS){ if(found.has(h.k)) outline(h,'#2bd13f'); else if(over) outline(h,'#ffd23a',true); }
+    for(const m of marks){ g.globalAlpha = Math.max(0, m.life); g.lineWidth = 5; g.strokeStyle = '#e8323f'; g.beginPath(); g.moveTo(m.x-11,m.y-11); g.lineTo(m.x+11,m.y+11); g.moveTo(m.x+11,m.y-11); g.lineTo(m.x-11,m.y+11); g.stroke(); g.globalAlpha = 1; }
+  };
+  const end = ()=>{
+    if(over) return; over = true;
+    for(const h of SPOT_ERRS) if(!found.has(h.k)) fl.insertAdjacentHTML('beforeend', '<li class="missed">Übersehen: '+esc(h.t)+'</li>');
+    const b = $('#stopBtn'); b.className = 'btn'; b.textContent = 'Auswertung';
+    b.onclick = ()=> finishStation(n, starsFrom(found.size,4,3,2), found.size+' von 5 KI-Fehlern gefunden.');
+    b.focus({preventScroll:true});
+  };
+  sc.addEventListener('pointerdown', e=>{
+    if(over) return;
+    const r = sc.getBoundingClientRect(), x = (e.clientX-r.left)/r.width*640, y = (e.clientY-r.top)/r.height*400;
+    const h = SPOT_ERRS.find(h=>!found.has(h.k) && hitTest(h,x,y));
+    if(h){ found.add(h.k); $('#sf').textContent = found.size; fl.insertAdjacentHTML('beforeend','<li>✓ '+esc(h.t)+'</li>'); if(found.size === SPOT_ERRS.length) end(); }
+    else if(!SPOT_ERRS.some(h=>found.has(h.k) && hitTest(h,x,y))){ marks.push({x,y,life:1}); left = Math.max(0, left-3); }
+  });
+  $('#stopBtn').onclick = end;
+  const tick = (now)=>{
+    const dt = Math.min(.1,(now-last)/1000); last = now;
+    if(!over){ left -= dt; if(left <= 0){ left = 0; end(); } }
+    timer.style.width = (left/TIME*100)+'%';
+    for(const m of marks) m.life -= dt*1.2;
+    draw(); raf = requestAnimationFrame(tick);
+  };
+  me.stop = ()=>cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(tick);
+}
+
+/* 5) Puzzle: Reihenfolge (Lucy, Rico) */
+function mgOrder(n){
+  const steps = n.mg.steps, N = steps.length;
+  const slots = Array(N).fill(null), okSlot = Array(N).fill(false);
+  let pool = shuffle(steps.map((_,i)=>i)), tries = 0, finished = false;
+  if(pool.every((v,i)=>v===i)) pool.reverse();
+  MG = {};
+  show(`${header(n)}
+    <div class="mg-top"><b>${esc(n.mg.task)}</b><b>Versuch <span id="tr">1</span> / 3</b></div>
+    <div class="order-slots" id="os"></div>
+    <div class="mg-hint">Tippe die Karten unten der Reihe nach an. Eine Karte oben antippen legt sie zurück.</div>
+    <div class="opool" id="op"></div>
+    <div id="mgfb"></div>
+    <div class="actions"><button class="btn" type="button" id="chk">Reihenfolge prüfen</button></div>`);
+  const render = ()=>{
+    $('#os').innerHTML = slots.map((v,i)=>`<div class="oslot ${okSlot[i]?'ok':''}"><span class="no">${i+1}</span>${v===null ? '<span class="free">frei</span>' : `<button class="ocard" type="button" data-s="${i}">${esc(steps[v])}</button>`}</div>`).join('');
+    $('#op').innerHTML = pool.map(v=>`<button class="ocard" type="button" data-p="${v}">${esc(steps[v])}</button>`).join('');
+    panel.querySelectorAll('#os [data-s]').forEach(b=> b.onclick = ()=>{ const i = +b.dataset.s; if(okSlot[i] || finished) return; pool.push(slots[i]); slots[i] = null; render(); });
+    panel.querySelectorAll('#op [data-p]').forEach(b=> b.onclick = ()=>{ if(finished) return; const v = +b.dataset.p, i = slots.indexOf(null); if(i<0) return; slots[i] = v; pool = pool.filter(x=>x!==v); render(); });
+  };
+  render();
+  $('#chk').onclick = ()=>{
+    if(finished) return;
+    if(slots.includes(null)){ toast('Lege zuerst alle Karten in die Reihenfolge.'); return; }
+    tries++;
+    let all = true, right = 0;
+    slots.forEach((v,i)=>{ if(v===i){ okSlot[i] = true; right++; } else { all = false; pool.push(v); slots[i] = null; } });
+    const fb = $('#mgfb'), b = $('#chk');
+    if(all || tries>=3){
+      finished = true;
+      if(!all){ pool = []; steps.forEach((_,i)=>{ slots[i] = i; okSlot[i] = true; }); }
+      render();
+      fb.innerHTML = `<div class="feedback ${all?'good':'bad'}" style="margin-top:12px"><strong>${all ? 'Geschafft, alles in der richtigen Reihenfolge!' : 'Das war knifflig!'}</strong>${all ? 'Gelöst im '+tries+'. Versuch.' : 'Oben siehst du jetzt die richtige Reihenfolge. Lies sie dir in Ruhe durch.'}</div>`;
+      b.textContent = 'Auswertung';
+      b.onclick = ()=> finishStation(n, all ? 4-tries : 0, all ? 'Gelöst im '+tries+'. Versuch.' : 'Nicht in 3 Versuchen gelöst.');
+      b.focus({preventScroll:true}); b.scrollIntoView({block:'nearest'});
+    } else {
+      render();
+      $('#tr').textContent = tries+1;
+      fb.innerHTML = `<div class="feedback bad" style="margin-top:12px"><strong>${right} von ${N} Karten liegen richtig (grün).</strong>Die anderen sind zurück im Stapel. Versuch es nochmal!</div>`;
+    }
+  };
+}
+
+/* 6) Lückentext (Ben, DJ Zola) */
+function normAns(x){ return String(x).toLowerCase().trim().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/[^a-z0-9]/g,''); }
+function lev(a,b){ const d = Array.from({length:a.length+1},(_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j; for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; }
+function ansOk(input, alts){ const x = normAns(input); if(!x) return false; return alts.some(a=>{ const y = normAns(a); return x===y || (y.length>=6 && lev(x,y)<=1); }); }
+function mgCloze(n){
+  const gaps = []; let html = '';
+  n.mg.text.split(/(\[[^\]]+\])/).forEach(part=>{
+    if(!part) return;
+    if(part[0]==='['){ const alts = part.slice(1,-1).split('|'), i = gaps.length; gaps.push(alts);
+      html += `<input class="gap" id="gap${i}" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:${Math.max(7, alts[0].length+3)}ch" aria-label="Lücke ${i+1}">`; }
+    else html += esc(part).replace(/\n/g,'<br>');
+  });
+  const bank = shuffle([...gaps.map(g=>g[0]), ...(n.mg.extra||[])]);
+  MG = {};
+  show(`${header(n)}
+    <div class="mg-top"><b>Fülle die ${gaps.length} Lücken aus!</b></div>
+    <div class="cloze">${html}</div>
+    <div class="mg-hint">Tippe die Wörter ein oder tippe unten im Wortspeicher auf ein Wort. Achtung: Nicht alle Wörter passen!</div>
+    <div class="bank">${bank.map(w=>`<button class="pchip" type="button" data-w="${esc(w)}">${esc(w)}</button>`).join('')}</div>
+    <div id="mgfb"></div>
+    <div class="actions"><button class="btn" type="button" id="chk">Prüfen</button></div>`);
+  const inputs = [...panel.querySelectorAll('.gap')];
+  let lastF = 0, checked = false;
+  const markUsed = ()=>{ const vals = inputs.map(x=>normAns(x.value)); panel.querySelectorAll('.bank .pchip').forEach(b=> b.classList.toggle('used', vals.includes(normAns(b.dataset.w)))); };
+  inputs.forEach((inp,i)=>{
+    inp.addEventListener('focus', ()=>{ lastF = i; });
+    inp.addEventListener('input', markUsed);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); (inputs[i+1] || $('#chk')).focus(); } });
+  });
+  panel.querySelectorAll('.bank .pchip').forEach(b=> b.onclick = ()=>{
+    if(checked) return;
+    let i = (inputs[lastF] && !inputs[lastF].value.trim()) ? lastF : inputs.findIndex(x=>!x.value.trim());
+    if(i<0) i = lastF;
+    inputs[i].value = b.dataset.w;
+    const nx = inputs.findIndex(x=>!x.value.trim()); lastF = nx>=0 ? nx : i;
+    markUsed();
+  });
+  $('#chk').onclick = ()=>{
+    if(checked) return;
+    if(inputs.some(x=>!x.value.trim())){ toast('Fülle zuerst alle Lücken aus.'); return; }
+    checked = true;
+    let right = 0;
+    inputs.forEach((inp,i)=>{ const ok = ansOk(inp.value, gaps[i]); inp.readOnly = true; inp.classList.add(ok?'ok':'no'); if(ok) right++; else inp.insertAdjacentHTML('afterend', ` <span class="gap-fix">→ ${esc(gaps[i][0])}</span>`); });
+    panel.querySelectorAll('.bank .pchip').forEach(b=> b.disabled = true);
+    const N = gaps.length;
+    $('#mgfb').innerHTML = `<div class="feedback ${right===N?'good':'bad'}" style="margin-top:12px"><strong>${right} von ${N} Lücken richtig!</strong>${right===N ? 'Perfekt ausgefüllt.' : 'Die richtigen Wörter stehen jetzt grün daneben. Lies den Text nochmal in Ruhe.'}</div>`;
+    const b = $('#chk'); b.textContent = 'Auswertung';
+    b.onclick = ()=> finishStation(n, starsFrom(right, N, N-1, N-2), right+' von '+N+' Lücken richtig.');
+    b.focus({preventScroll:true}); b.scrollIntoView({block:'nearest'});
+  };
+}
+
+/* 7) Bild-Prompt-Puzzle (Kiki) */
+function drawElephant(cv){
+  const w = cv.clientWidth || 600, d = Math.min(2, window.devicePixelRatio||1);
+  cv.width = Math.round(w*d); cv.height = Math.round(w*360/640*d);
+  const g = cv.getContext('2d'), s = cv.width/640; g.setTransform(s,0,0,s,0,0);
+  const sky = g.createLinearGradient(0,0,0,180); sky.addColorStop(0,'#6fc8ff'); sky.addColorStop(1,'#ffe7c2'); g.fillStyle = sky; g.fillRect(0,0,640,180);
+  circ(g,300,58,30); fs(g,'#ffd23a',3);
+  g.fillStyle = '#2aa3e0'; g.fillRect(0,170,640,60);
+  g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 3;
+  for(let x=10;x<640;x+=70){ g.beginPath(); g.moveTo(x,192); g.quadraticCurveTo(x+15,184,x+30,192); g.stroke(); g.beginPath(); g.moveTo(x+35,212); g.quadraticCurveTo(x+50,204,x+65,212); g.stroke(); }
+  g.fillStyle = '#f6d58f'; g.beginPath(); g.moveTo(0,232); g.quadraticCurveTo(320,214,640,232); g.lineTo(640,360); g.lineTo(0,360); g.closePath(); g.fill();
+  const palm = (x, h, lean)=>{
+    g.beginPath(); g.moveTo(x,300); g.quadraticCurveTo(x+lean*0.4,300-h*0.5,x+lean,300-h); g.lineWidth = 14; g.strokeStyle = INK; g.stroke(); g.lineWidth = 9; g.strokeStyle = '#a8652f'; g.stroke();
+    const tx = x+lean, ty = 300-h;
+    for(const a of [-2.7,-2.1,-1.5,-0.9,-0.3]){ g.save(); g.translate(tx,ty); g.rotate(a); ell(g,34,0,36,10); fs(g,'#3caa4a',3); g.restore(); }
+    circ(g,tx-6,ty+8,7); fs(g,'#7a4a22',2.5); circ(g,tx+7,ty+9,7); fs(g,'#7a4a22',2.5); circ(g,tx,ty+16,7); fs(g,'#7a4a22',2.5);
+  };
+  palm(70,170,18); palm(140,130,-14); palm(600,150,-20);
+  ell(g,330,318,140,16); g.fillStyle = 'rgba(120,80,30,.3)'; g.fill();
+  const pink = '#ff9ec7', pinkD = '#f074a8';
+  for(const lx of [240,280,360,398]){ rr(g,lx,270,30,46,10); fs(g,pinkD,3); }
+  ell(g,320,248,112,62); fs(g,pink,3);
+  g.beginPath(); g.moveTo(210,240); g.quadraticCurveTo(190,250,196,270); g.lineWidth = 6; g.strokeStyle = INK; g.stroke(); g.lineWidth = 3; g.strokeStyle = pinkD; g.stroke();
+  // Rüssel mit Eis
+  g.beginPath(); g.moveTo(452,214); g.quadraticCurveTo(505,215,500,150); g.lineWidth = 30; g.strokeStyle = INK; g.stroke(); g.lineWidth = 24; g.strokeStyle = pink; g.stroke();
+  circ(g,430,186,56); fs(g,pink,3);
+  ell(g,392,190,34,44); fs(g,pinkD,3);
+  ell(g,446,174,9,11); fs(g,'#fff',2.5); circ(g,449,176,5); g.fillStyle = INK; g.fill(); circ(g,451,173,1.8); g.fillStyle = '#fff'; g.fill();
+  g.beginPath(); g.arc(452,200,10,0.1*Math.PI,0.8*Math.PI); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
+  ell(g,468,195,8,5); g.fillStyle = 'rgba(255,90,140,.5)'; g.fill();
+  g.beginPath(); g.moveTo(482,138); g.lineTo(518,138); g.lineTo(500,182); g.closePath(); fs(g,'#e0a565',3);
+  g.strokeStyle = '#a8652f'; g.lineWidth = 2; g.beginPath(); g.moveTo(488,146); g.lineTo(510,146); g.moveTo(492,156); g.lineTo(506,156); g.stroke();
+  circ(g,500,126,19); fs(g,'#ffb3d1',3);
+  circ(g,500,104,15); fs(g,'#fff6e8',3);
+  circ(g,500,88,7); fs(g,'#e8323f',2.5);
+  const spr = ['#36a3ff','#4fd43e','#ffd23a','#b05cff','#ff5a4d'];
+  for(let i=0;i<14;i++){ const a = i*2.4, r = 6+(i%3)*5; g.save(); g.translate(500+Math.cos(a)*r, 118+Math.sin(a)*r*0.8); g.rotate(a); g.fillStyle = spr[i%5]; g.fillRect(-4,-1.5,8,3); g.restore(); }
+}
+function mgMatch(n){
+  const slots = n.mg.slots;
+  const pieces = shuffle([...slots.map((sl,i)=>({t:sl.answer, slot:i})), ...(n.mg.extra||[]).map(t=>({t, slot:-1}))]);
+  const placed = Array(slots.length).fill(null), ok = Array(slots.length).fill(false);
+  let sel = null, tries = 0, finished = false;
+  MG = {};
+  show(`${header(n)}
+    <div class="mg-top"><b>Baue den Bild-Prompt zusammen!</b><b>Versuch <span id="tr">1</span> / 3</b></div>
+    <div class="match-slots" id="ms"></div>
+    <div class="mg-hint">Tippe zuerst ein Puzzleteil an und dann das passende Feld. Ein Feld antippen legt das Teil zurück.</div>
+    <div class="chip-pool" id="mp"></div>
+    <div id="mgfb"></div>
+    <div class="actions"><button class="btn" type="button" id="chk">Puzzle prüfen</button></div>`);
+  const render = ()=>{
+    $('#ms').innerHTML = slots.map((sl,i)=>`<div class="mslot ${ok[i]?'ok':''} ${sel!==null && !ok[i] ? 'ready' : ''}" data-i="${i}" role="button" tabindex="0" aria-label="Feld ${esc(sl.label)}"><b>${esc(sl.label)}</b>${placed[i]!==null ? `<span class="pchip ${ok[i]?'isgood':'on'}">${esc(pieces[placed[i]].t)}</span>` : '<span class="free">Teil hier ablegen</span>'}</div>`).join('');
+    $('#mp').innerHTML = pieces.map((p,k)=> placed.includes(k) ? '' : `<button class="pchip ${sel===k?'sel':''}" type="button" data-k="${k}">${esc(p.t)}</button>`).join('');
+    panel.querySelectorAll('#mp .pchip').forEach(b=> b.onclick = ()=>{ if(finished) return; const k = +b.dataset.k; sel = sel===k ? null : k; render(); });
+    panel.querySelectorAll('#ms .mslot').forEach(dv=>{
+      const act = ()=>{ const i = +dv.dataset.i; if(ok[i] || finished) return; if(sel!==null){ placed[i] = sel; sel = null; } else if(placed[i]!==null){ placed[i] = null; } render(); };
+      dv.onclick = act; dv.onkeydown = e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); act(); } };
+    });
+  };
+  render();
+  $('#chk').onclick = ()=>{
+    if(finished) return;
+    if(placed.includes(null)){ toast('Lege zuerst in alle '+slots.length+' Felder ein Teil.'); return; }
+    tries++;
+    let all = true;
+    placed.forEach((k,i)=>{ if(pieces[k].slot===i) ok[i] = true; else { all = false; placed[i] = null; } });
+    const fb = $('#mgfb'), b = $('#chk');
+    if(all || tries>=3){
+      finished = true;
+      if(!all) slots.forEach((_,i)=>{ placed[i] = pieces.findIndex(p=>p.slot===i); ok[i] = true; });
+      render();
+      const prompt = 'Erstelle ein Bild '+slots[0].answer+': '+slots[1].answer+', der '+slots[2].answer.replace(/^isst /,'')+' isst. Im Hintergrund: '+slots[3].answer+'.';
+      fb.innerHTML = `<div class="feedback ${all?'good':'bad'}" style="margin-top:12px"><strong>${all ? 'Puzzle gelöst!' : 'So wäre es richtig gewesen:'}</strong>Fertiger Prompt: „${esc(prompt)}“</div>
+        ${all ? '<div class="reveal"><div class="ki-reply"><span>KI</span>Hier ist dein Bild!</div><canvas id="eleph" aria-label="Comic-Bild: ein rosaroter Elefant isst am Strand ein Eis"></canvas></div>' : ''}`;
+      if(all) drawElephant($('#eleph'));
+      b.textContent = 'Auswertung';
+      b.onclick = ()=> finishStation(n, all ? 4-tries : 0, all ? 'Gelöst im '+tries+'. Versuch.' : 'Nicht in 3 Versuchen gelöst.');
+      b.focus({preventScroll:true}); b.scrollIntoView({block:'nearest'});
+    } else {
+      render();
+      $('#tr').textContent = tries+1;
+      fb.innerHTML = `<div class="feedback bad" style="margin-top:12px"><strong>${ok.filter(Boolean).length} von ${slots.length} Teilen passen (grün).</strong>Die anderen sind zurück im Stapel. Versuch es nochmal!</div>`;
+    }
+  };
+}
+const MINIGAMES = {sort:mgSort, prompt:mgPrompt, facts:mgFacts, spot:mgSpot, order:mgOrder, cloze:mgCloze, match:mgMatch};
+
+function openKai(){
+  if(save.license){
+    show(`${header(KAI)}<div class="bubble">Glückwunsch, ${esc(HEROES[save.char||0].name)}! Du hast deinen KI-Führerschein schon. Willst du ihn nochmal ansehen?</div>
+      <div class="actions"><button class="btn ghost" type="button" data-a="exam">Prüfung wiederholen</button><button class="btn" type="button" data-a="lic" data-focus>Führerschein zeigen</button></div>`);
+    return bind({lic:showLicense, exam:examIntro});
+  }
+  if(!allDone()){
+    const open = STATIONS.filter(s=>!(save.st[s.id]&&save.st[s.id].done));
+    show(`${header(KAI)}<div class="bubble">Piep! Ich bin KAI, dein Prüfer. Bevor du zur Prüfung darfst, hilf allen ${STATIONS.length} Personen in der Arena. Dir fehlen noch <b>${open.length}</b>: ${open.map(s=>esc(s.name)).join(', ')}.</div>
+      <div class="actions"><button class="btn ghost" type="button" data-a="ov">Übersicht</button><button class="btn" type="button" data-a="close" data-focus>Okay, los!</button></div>`);
+    return bind({close:closeDialog, ov:()=>{ closeDialog(); openOverview(); }});
+  }
+  examIntro();
+}
+function examIntro(){
+  show(`${header(KAI)}<div class="bubble">Stark, du hast allen geholfen! Jetzt kommt die praktische Prüfung: <b>${STATIONS.length} Fragen</b> aus allen Themen. Mit <b>${EXAM_PASS} richtigen Antworten</b> bekommst du deinen KI-Führerschein.</div>
+    <div class="actions"><button class="btn ghost" type="button" data-a="close">Noch nicht</button><button class="btn" type="button" data-a="go" data-focus>Prüfung starten</button></div>`);
+  bind({close:closeDialog, go:startExam});
+}
+function examResult(){
+  const right = Q.res.filter(Boolean).length, pass = right >= EXAM_PASS;
+  const wrongTopics = Q.qs.filter((q,i)=>!Q.res[i]).map(q=>q.topic);
+  if(pass && !save.license){ save.license = {no: 'KI-'+String(Math.floor(100000+Math.random()*900000)), date: new Date().toLocaleDateString('de-DE')}; persist(); }
+  show(`${header(KAI)}
+    <div class="result">
+      <h2>${pass ? 'BESTANDEN!' : 'Noch nicht bestanden'}</h2>
+      <p style="font-family:var(--display);font-size:40px;color:${pass?'var(--green)':'var(--yellow)'};text-shadow:0 3px 0 var(--ink);margin:6px 0">${right} / ${STATIONS.length}</p>
+      <p>${pass ? 'Du hast die Prüfung geschafft. Hier ist dein KI-Führerschein!' : 'Du brauchst mindestens '+EXAM_PASS+' richtige Antworten. Schau dir diese Themen nochmal an:'}</p>
+      ${!pass && wrongTopics.length ? '<p style="color:var(--yellow)">'+wrongTopics.map(esc).join(' · ')+'</p>' : ''}
+    </div>
+    <div class="actions" style="justify-content:center">
+      ${pass ? '<button class="btn" type="button" data-a="lic" data-focus>Führerschein ansehen</button>' : '<button class="btn ghost" type="button" data-a="close">Zurück in die Arena</button><button class="btn" type="button" data-a="again" data-focus>Nochmal versuchen</button>'}
+    </div>`);
+  bind({lic:showLicense, close:closeDialog, again:startExam});
+  if(pass){ burst(KAI.x,KAI.y-80,'#50e6ff',60); updateHud(); }
+}
+function showLicense(){
+  const L = save.license || {no:'—', date:'—'};
+  show(`<div class="license">
+    <div class="lic-top"><div class="lic-badge">KI</div><div class="lic-title">KI-FÜHRERSCHEIN<small>KI VERSTEHEN · RICHTIG NUTZEN · SICHER SEIN</small></div></div>
+    <div class="lic-body">
+      <div class="lic-photo"><canvas class="pt" data-id="me"></canvas>SPIELFIGUR</div>
+      <div style="min-width:0">
+        <h4>Herzlichen Glückwunsch!</h4>
+        <p>Du hast den KI-Führerschein geschafft und viel über Künstliche Intelligenz gelernt:</p>
+        <ul class="skills">
+          <li><i style="background:#2e9a52">✓</i>du kennst die <em>KI-Grundlagen</em>,</li>
+          <li><i style="background:#1a6fe0">✓</i>du weißt, wie man <em>KI richtig nutzt</em>,</li>
+          <li><i style="background:#8a3fd1">✓</i>du erkennst <em>Fake-Bilder und KI-Fehler</em>,</li>
+          <li><i style="background:#e8742a">✓</i>du gehst <em>sicher mit KI</em> um.</li>
+        </ul>
+        <div class="lic-fields">
+          <div><span>SPIELFIGUR</span><b>${esc(save.name || HEROES[save.char||0].name)}</b></div>
+          <div><span>DATUM</span><b>${esc(L.date)}</b></div>
+          <div><span>FÜHRERSCHEIN-NR.</span><b>${esc(L.no)}</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="promise"><b>MEIN VERSPRECHEN:</b> Ich nutze KI neugierig, fair und verantwortungsvoll. Ich prüfe Informationen kritisch und gehe respektvoll mit anderen Menschen um.</div>
+    <div class="lic-foot">OFFIZIELL VERLIEHEN VON KAI IN DER KI-ARENA · ★ ${starCount()}/${STATIONS.length*3} STERNE</div>
+  </div>
+  <p style="font-weight:800;color:var(--muted);text-align:center;margin:12px 0 4px">Mach einen Screenshot und zeig ihn deiner Lehrkraft. Dann bekommst du deinen Führerschein auf Papier.</p>
+  <div class="actions" style="justify-content:center"><button class="btn" type="button" data-a="close" data-focus>Zurück in die Arena</button></div>`);
+  bind({close:closeDialog});
+}
+
+/* ===================== ÜBERSICHT ===================== */
+const ov = document.getElementById('overview'), ovPanel = document.getElementById('ovPanel');
+function openOverview(){
+  paused = true; joy.active=false; joy.dx=joy.dy=0;
+  const card = s => { const st = save.st[s.id]; const d = st && st.done; return `<div class="ov ${d?'done':''}"><canvas class="pt" data-id="${s.id}"></canvas>
+    <div class="t"><b>${s.nr} · ${esc(s.name)}</b><span>${esc(s.topic)}${s.mg ? ' · <b style="display:inline;font-size:13px;color:var(--yellow)">Minigame</b>' : ''}</span><span class="s">${st ? '★'.repeat(st.stars)+'☆'.repeat(3-st.stars) : lockedLast(s) ? '<span style="display:inline;color:var(--muted)">Erst zum Schluss</span>' : '☆☆☆'}</span></div>
+    <button class="btn small ${d?'ghost':''}" type="button" data-go="${s.id}">Weg zeigen</button></div>`; };
+  const zonesHtml = Object.keys(ZONES).map(z=>`<div class="zone-h"><i style="background:${ZONES[z].color}"></i>${esc(ZONES[z].name).toUpperCase()}</div><div class="ov-grid">${STATIONS.filter(s=>s.zone===z).sort((a,b)=>a.nr-b.nr).map(card).join('')}</div>`).join('');
+  ovPanel.innerHTML = `<div class="qhead"><h2>Deine Missionen</h2><button class="btn small ghost" type="button" id="ovClose">Schließen</button></div>
+    <p style="font-weight:800;color:var(--muted);margin:4px 0 0">${doneCount()} von ${STATIONS.length} Personen geholfen · ★ ${starCount()}/${STATIONS.length*3} ${save.license ? ' · Führerschein: <span style="color:var(--yellow)">bestanden</span>' : allDone() ? ' · <span style="color:var(--yellow)">Jetzt zu KAI zur Prüfung!</span>' : ''}</p>
+    ${zonesHtml}
+    <div class="actions" style="margin-top:14px;justify-content:space-between">
+      <button class="btn small red" type="button" id="resetBtn">Spielstand löschen</button>
+      ${save.license ? '<button class="btn small" type="button" id="licBtn">Führerschein</button>' : '<button class="btn small blue" type="button" id="kaiBtn">Weg zu KAI</button>'}
+    </div><div id="confirmBox"></div>`;
+  ov.hidden = false; paintAll(ovPanel);
+  document.getElementById('ovClose').addEventListener('click', closeOverview);
+  document.getElementById('ovClose').focus({preventScroll:true});
+  ovPanel.querySelectorAll('[data-go]').forEach(b=> b.addEventListener('click', ()=>{ guideTarget = STATIONS.find(s=>s.id===b.dataset.go); closeOverview(); toast('Folge dem gelben Pfeil zu '+guideTarget.name+'!'); }));
+  const kb = document.getElementById('kaiBtn'); if(kb) kb.addEventListener('click', ()=>{ guideTarget = KAI; closeOverview(); toast('Folge dem gelben Pfeil zu KAI!'); });
+  const lb = document.getElementById('licBtn'); if(lb) lb.addEventListener('click', ()=>{ ov.hidden = true; showLicense(); });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    document.getElementById('confirmBox').innerHTML = `<div class="confirm">Wirklich alles löschen? Sterne und Führerschein sind dann weg.<div class="actions"><button class="btn small ghost" type="button" id="noR">Abbrechen</button><button class="btn small red" type="button" id="yesR">Ja, löschen</button></div></div>`;
+    document.getElementById('noR').addEventListener('click', ()=> document.getElementById('confirmBox').innerHTML='');
+    document.getElementById('yesR').addEventListener('click', ()=>{ save.st = {}; save.license = null; save.kikiHint = false; wasUnlocked = false; persist(); updateHud(); closeOverview(); toast('Spielstand gelöscht. Viel Erfolg beim neuen Versuch!'); });
+  });
+}
+function closeOverview(){ if(ov.hidden) return; ov.hidden = true; if(dlg.hidden) paused = false; for(const k in keys) keys[k]=false; }
+
+/* ===================== WORTSPEICHER ===================== */
+const GLOSSARY = [
+  ['Bild-KI','Eine KI, die aus einer Beschreibung ein Bild erstellt.','Du beschreibst einen rosaroten Elefanten mit Eis, und die Bild-KI malt ihn.','Kiki'],
+  ['Bild-Stil','Wie ein Bild aussehen soll, z. B. Comic, Zeichnung oder Foto.','„Erstelle ein Bild im Comic-Style …“','Kiki'],
+  ['Chatbot','Ein KI-Programm, mit dem du schreiben kannst wie in einem Chat. Es antwortet auf deine Fragen.','Du fragst: „Wie funktioniert ein Vulkan?“, und der Chatbot erklärt es dir.','Milo'],
+  ['Daten','Informationen wie Texte, Bilder, Zahlen oder Töne. Eine KI lernt aus sehr vielen Daten.','','Milo'],
+  ['Datenschutz','Regeln, die deine persönlichen Daten und die Daten anderer Menschen schützen.','Deine Adresse gibst du nicht in eine KI ein.','Paul'],
+  ['Deepfake','Ein mit KI gefälschtes Bild, Video oder eine gefälschte Stimme, die täuschend echt wirkt.','Ein Video, in dem ein Hai durch eine Einkaufsstraße schwimmt.','Jules'],
+  ['Fake','Etwas Gefälschtes, das echt aussehen soll.','„Fake oder echt?“ Prüfe immer die Quelle!','Jules'],
+  ['Halluzinieren','Wenn eine KI Dinge erfindet, die überzeugend klingen, aber falsch sind.','Die KI behauptet: „Der Eiffelturm steht in Rom.“','Dr. Nova'],
+  ['KI (Künstliche Intelligenz)','Computerprogramme, die aus vielen Daten lernen, Muster erkennen und so Texte, Bilder oder Antworten erzeugen. Auf Englisch: AI.','','Milo'],
+  ['KI-Modell','Ein bestimmtes KI-Programm. Es gibt viele verschiedene Modelle, die unterschiedliche Dinge gut können.','Manche Modelle machen Bilder, andere Texte oder Musik.','Kiki'],
+  ['Lernpartner','Die KI hilft dir beim Lernen: Sie stellt dir Fragen und prüft deine Antworten.','„Stell mir 5 Fragen zum Text und prüfe meine Antworten.“','Ben'],
+  ['Lernzielkontrolle','Ein Test in der Schule, in dem du zeigst, was du gelernt hast.','','Yara'],
+  ['Mindestalter','Das Alter, ab dem du einen Dienst nutzen darfst. Viele KI-Dienste haben ein Mindestalter oder brauchen die Erlaubnis deiner Eltern.','','MUE'],
+  ['Muster','Etwas, das sich wiederholt. Eine KI erkennt Muster in Daten und berechnet daraus die wahrscheinlichste Antwort.','','Milo'],
+  ['Personen-Chat','Ein Chat, in dem die KI eine bestimmte Person spielt, z. B. eine berühmte Forscherin.','„Du bist Marie Curie. Wann hast du gelebt?“','Lucy'],
+  ['Persönliche Daten','Informationen, die zu einer bestimmten Person gehören: Name, Adresse, Telefonnummer, Geburtsdatum, Passwörter und Fotos.','Diese Daten gehören nicht in eine KI!','Paul'],
+  ['Platzhalter','Ein Ersatz für echte Daten. Die echten Daten trägst du später selbst ein.','„Schreib eine Einladung für [Name].“','Paul'],
+  ['Prompt','Deine Eingabe oder Anweisung an die KI. Je genauer der Prompt, desto besser das Ergebnis.','„Schreibe einen kurzen Sachtext für die 7. Klasse über Haie.“','Lina'],
+  ['Quelle','Woher eine Information stammt, z. B. eine Internetseite, ein Buch oder ein Schulbuch.','„Nenne mir die Quellen für deine Antwort.“','Dr. Nova'],
+  ['Recherche','Die gezielte Suche nach Informationen zu einem Thema.','Für ein Referat suchst du passende Webseiten.','Lucy'],
+  ['Recht am eigenen Bild','Jeder Mensch darf selbst bestimmen, ob Fotos von ihm gezeigt oder weitergegeben werden.','Lade keine Fotos von anderen in eine KI hoch.','MUE'],
+  ['Referat','Ein Vortrag über ein Thema, den du vor der Klasse hältst.','Die KI kann dir Ideen und eine Themenübersicht liefern.','Rico'],
+  ['Rolle','Die Person, die die KI in einem Personen-Chat spielen soll.','„Du bist Marie Curie.“','Lucy'],
+  ['Seriöse Quelle','Eine vertrauenswürdige Quelle, z. B. bekannte Nachrichtenseiten oder Schulbücher.','','Jules'],
+  ['Song-Konzept','Der Plan für einen Song: Thema, Textideen und Stilrichtung.','Das Konzept gibst du in eine Song-KI wie Suno ein.','DJ Zola'],
+  ['Stichpunkte','Kurze Notizen statt ganzer Sätze. Sie zeigen das Wichtigste auf einen Blick.','','Ben'],
+  ['Stilrichtung','Die Musikart eines Songs, z. B. Pop, Rock oder Schlager.','','DJ Zola'],
+  ['Text-KI','Eine KI, die Texte schreibt, zusammenfasst und Fragen beantwortet.','Sie kann dir auch einen Prompt für eine Bild-KI formulieren.','Lina'],
+  ['Textart','Was für ein Text es ist, z. B. eine Geschichte, ein Sachtext, ein Brief oder eine Anleitung.','','Ben'],
+  ['Zusammenfassung','Das Wichtigste aus einem Text in kurzer Form.','Fotografiere einen Text und lass ihn in Stichpunkten zusammenfassen.','Ben']
+].sort((a,b)=>a[0].localeCompare(b[0],'de'));
+const gl = document.getElementById('glossary'), glPanel = document.getElementById('glPanel');
+function renderGlossary(q){
+  const nq = q.trim().toLowerCase();
+  const list = GLOSSARY.filter(g=> !nq || (g[0]+' '+g[1]+' '+g[2]+' '+g[3]).toLowerCase().includes(nq));
+  let html = '', letter = '';
+  const groups = {};
+  list.forEach(g=>{ const L = g[0][0].toUpperCase(); (groups[L] = groups[L] || []).push(g); });
+  for(const L of Object.keys(groups)){
+    html += `<div class="gl-letter">${esc(L)}</div><div class="gl-grid">${groups[L].map(g=>`<div class="gl-item"><h4>${esc(g[0])}</h4><p>${esc(g[1])}</p>${g[2] ? '<p class="ex">'+esc(g[2])+'</p>' : ''}<span class="who">KOMMT VOR BEI: ${esc(g[3]).toUpperCase()}</span></div>`).join('')}</div>`;
+  }
+  document.getElementById('glList').innerHTML = html || '<p class="gl-empty">Kein Wort gefunden. Versuch es mit einem anderen Suchbegriff.</p>';
+}
+function openGlossary(){
+  paused = true; joy.active = false; joy.dx = joy.dy = 0;
+  glPanel.innerHTML = `<div class="qhead"><h2>Wortspeicher</h2><button class="btn small ghost" type="button" id="glClose">Schließen</button></div>
+    <p style="font-weight:800;color:var(--muted);margin:4px 0 0">Hier findest du die wichtigsten Wörter rund um KI, einfach erklärt.</p>
+    <input class="gl-search" id="glSearch" type="search" placeholder="Wort suchen, z. B. Prompt" autocomplete="off" aria-label="Wort suchen">
+    <div id="glList"></div>`;
+  gl.hidden = false;
+  renderGlossary('');
+  const inp = document.getElementById('glSearch');
+  inp.addEventListener('input', ()=> renderGlossary(inp.value));
+  inp.addEventListener('keydown', e=>{ if(e.key==='Escape') closeGlossary(); });
+  document.getElementById('glClose').addEventListener('click', closeGlossary);
+  document.getElementById('glClose').focus({preventScroll:true});
+  glPanel.scrollTop = 0;
+}
+function closeGlossary(){ if(gl.hidden) return; gl.hidden = true; if(dlg.hidden && ov.hidden) paused = false; for(const k in keys) keys[k]=false; }
+gl.addEventListener('pointerdown', e=>{ if(e.target===gl) closeGlossary(); });
+document.getElementById('glBtn').addEventListener('click', openGlossary);
+document.getElementById('menuBtn').addEventListener('click', openOverview);
+ov.addEventListener('pointerdown', e=>{ if(e.target===ov) closeOverview(); });
+
+/* ===================== START ===================== */
+/* Namensfilter: blockiert Schimpfwörter, auch mit Ziffern, Sonderzeichen oder doppelten Buchstaben */
+function normName(s){
+  return String(s).toLowerCase()
+    .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'s').replace(/ç/g,'c').replace(/ş/g,'s').replace(/ğ/g,'g').replace(/ı/g,'i').replace(/ł/g,'l')
+    .replace(/[0@]/g,'o').replace(/[1!|]/g,'i').replace(/3/g,'e').replace(/4/g,'a').replace(/[5$]/g,'s').replace(/7/g,'t').replace(/8/g,'b')
+    .replace(/ph/g,'f').replace(/ck/g,'k').replace(/[^a-z]/g,'').replace(/(.)\1+/g,'$1');
+}
+const BAD_WORDS = ['arsch','fick','fotze','hure','nutte','wichs','wix','schlampe','missgeburt','spast','behindert','schwuchtel','kanake','neger','nigger','nigga','pimmel','penis','vagina','titten','muschi','kacke','kack','scheis','scheiss','pisse','pisser','bastard','penner','opfer','trottel','idiot','depp','dumm','doof','lappen','loser','kotz','bitch','fuck','shit','cunt','whore','slut','porn','sex','nazi','hitler','siegheil','hurensohn','wichser','ficker','huso','fresse','schnauze','kotze',
+  'opfa','spako','spaken','behindi','ehrenlos','zigeuner','schwanz','lutscher','pussy','dodel','pfosten','vollidiot','hackfresse','missgebur','mistgebur','bitsch','biatch','motherfuck','milf','nutensohn','kanacke','kartofelfres','hirni','spacki',
+  'kahba','kahbe','kahpe','kehpe','kurva','kurwa','pizda','orospu','sharmuta','sharmouta','charmuta','aminakoyim','aminakoyum','koyim','koyum','yarrak','pezevenk','hundesohn','blyat','blyad','spierdal','jebem','jebiga','siktir'].map(normName);
+// Kurze Slang-Wörter: nur als eigenes Wort (z. B. „Assi“, „Assi123“, „DerAssi“), damit Namen wie Asia oder Kasimir erlaubt bleiben
+const BAD_TOKENS = ['kah','kahb','kurv','suka','cyka','pic','ibne','gavat','manyak','hayvan','chuj','yarak','sik','amk','amena','assi','asi','lauch','mongo','homo','honk','affe','sau','schwein','noob','simp','kys','stfu','wtf','mofo','opfer','gay','hs','mf','dick','fett','fetti','ekel','spast','spasti','lappen','hund','kek','cringe','schwuli','tunte','bimbo','lusche','luschi','dumbo','pisser','arsch'].map(normName);
+function badTokens(s){
+  const parts = String(s).replace(/([a-zäöüß])([A-ZÄÖÜ])/g,'$1 $2').split(/[^A-Za-zÄÖÜäöüß0-9@$!|]+/);
+  const whole = String(s);
+  const cands = [whole, whole.replace(/[0-9]/g,''), ...parts, ...parts.map(p=>p.replace(/[0-9]/g,''))];
+  return cands.some(c => { const n = normName(c); return n && BAD_TOKENS.includes(n); });
+}
+const NAME_OK = ['marschall','barsch','harsch','dumbledore','essex','sexton','sextett'].map(normName);
+// Hass-Sprüche wie „ichhasseschule“, „Hass dich“, „ihateschool“
+const HATE_RX = [/(^|[^mr])ichas/, /^ihas/, /hase?(schule|dich|euch|lehrer|alle|mathe|deutsch|englisch|die|den|das|ihn|sie|mein|men|schuler|leben|unterricht|klase|you|u$)/, /ihate/, /hate(school|schule|you|u$|all|teacher|math|lehrer|dich)/, /^hate$/, /stinkt/, /verek/, /sterb/, /stirb/, /^tod$/];
+function isBadName(s){ let n = normName(s); if(HATE_RX.some(r=>r.test(n))) return true;
+  if(/^ha(ss|ß)e?$/.test(String(s).toLowerCase().replace(/[^a-zß]/g,''))) return true; for(const ok of NAME_OK) n = n.split(ok).join('-'); return (n.length > 0 && BAD_WORDS.some(w => n.includes(w))) || badTokens(s); }
+function setupStart(){
+  const picks = document.getElementById('picks');
+  picks.innerHTML = HEROES.map((h,i)=>`<button class="pick ${i===(save.char||0)?'sel':''}" type="button" data-i="${i}" aria-pressed="${i===(save.char||0)}"><canvas></canvas>${h.name}</button>`).join('');
+  picks.querySelectorAll('.pick').forEach(b=>{
+    paintPortrait(b.querySelector('canvas'), {look:HEROES[+b.dataset.i].look});
+    b.addEventListener('click', ()=>{ save.char = +b.dataset.i; picks.querySelectorAll('.pick').forEach(x=>{ x.classList.toggle('sel', x===b); x.setAttribute('aria-pressed', x===b); }); });
+  });
+  const sb = document.getElementById('startBtn');
+  if(doneCount() > 0 || save.license) sb.textContent = 'WEITERSPIELEN';
+  sb.addEventListener('click', ()=>{
+    save.name = '';
+    persist();
+    document.getElementById('start').hidden = true;
+    updateHud();
+    wasUnlocked = allDone();
+    showWelcome();
+  });
+}
+function showWelcome(){
+  show(`<div class="duo">${TEACHERS.map(t=>`<div><canvas class="pt" data-id="${t.id}"></canvas>${esc(t.name)}</div>`).join('')}</div>
+    <div style="text-align:center"><span class="tag" style="background:#ff4f9a">DEINE LEHRERINNEN</span></div>
+    <div class="bubble">Moin und herzlich willkommen in unserer Lernwelt! Schau dich doch mal um und löse die Aufgaben.<br><br><span style="color:#c21f86">Ganz wichtig: Lies dir alles gut und in Ruhe durch. Es geht nicht um Schnelligkeit!</span><br><br>Am Ende gibt es bei KAI eine kurze Abfrage zum Thema. Wenn du alles gut gelesen hast, schaffst du das bestimmt!</div>
+    <div class="actions" style="justify-content:center"><button class="btn" type="button" data-a="go" id="welcomeBtn" disabled>Bitte lesen … 5</button></div>`);
+  dlgLocked = true;
+  const wb = document.getElementById('welcomeBtn'); let sec = 5;
+  const iv = setInterval(()=>{ sec--; if(sec > 0){ wb.textContent = 'Bitte lesen … '+sec; return; } clearInterval(iv); dlgLocked = false; wb.disabled = false; wb.textContent = 'Danke, los geht’s!'; wb.focus({preventScroll:true}); }, 1000);
+  bind({go:()=>{ closeDialog(); toast(doneCount() ? 'Willkommen zurück! Noch '+(STATIONS.length-doneCount())+' Personen warten.' : 'Lauf zu den Leuten mit „?“ und hilf ihnen!'); blinkGl(); setTimeout(maybeKikiHint, 900); }});
+}
+function blinkGl(){
+  const b = document.getElementById('glBtn'); b.classList.remove('blink'); void b.offsetWidth; b.classList.add('blink');
+  setTimeout(()=> b.classList.remove('blink'), 3800);
+}
+
+function boot(data){
+  loadSave();
+  if(data && data.save) save = Object.assign(save, data.save);
+  if(data && data.px){ player.x = data.px; player.y = data.py; camera.x = data.px; camera.y = data.py; }
+  resize();
+  buildWorld();
+  setupStart();
+  updateHud(); updateAct();
+  const fontsReady = Promise.race([
+    Promise.all([document.fonts.load('64px "Lilita One"'), document.fonts.load('800 16px "Nunito"')]).catch(()=>{}),
+    new Promise(r=>setTimeout(r,1800))
+  ]);
+  fontsReady.then(()=>{ buildGround(); mmBase = null; document.querySelectorAll('.pick canvas').forEach((c,i)=>paintPortrait(c,{look:HEROES[i].look})); });
+  if(window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(()=>({save, px:player.x, py:player.y}));
+  requestAnimationFrame(t=>{ t0=t; loop(t); });
+}
+if(window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(boot); else boot((window.claude && window.claude.hot && window.claude.hot.data) || {});
+})();
+</script>
+
+</body>
+</html>
